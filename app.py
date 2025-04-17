@@ -14,7 +14,7 @@ key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 
 supabase: Client = create_client(url, key)
 
-##add_records("url","comment")を入れると、recordsに挿入される。
+##add_records("place","exp")を入れると、recordsに挿入される。
 def add_records(place,exp):
     data= {
         "place":place,
@@ -22,8 +22,16 @@ def add_records(place,exp):
     }
     response = supabase.table("records").insert(data).execute()
     return response
+<<<<<<< HEAD
 add_records("komeda","20") # ここに追加
 response =supabase.table(“records”).select(“*”).execute()
+=======
+
+##サンプル
+add_records("komeda",20)
+##records テーブルから全件選択してresponseに格納する
+response =supabase.table("records").select("*").execute()
+>>>>>>> 7808bd453a65da1461a687c7df5d2d43dd2160c9
 
 # 音楽ファイルを base64 に変換
 def get_audio_base64(file_path):
