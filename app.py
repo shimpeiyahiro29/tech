@@ -22,7 +22,8 @@ def add_records(place,exp):
     }
     response = supabase.table("records").insert(data).execute()
     return response
-
+add_records("komeda","20") # ここに追加
+response =supabase.table(“records”).select(“*”).execute()
 
 # 音楽ファイルを base64 に変換
 def get_audio_base64(file_path):
