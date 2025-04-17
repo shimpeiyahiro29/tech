@@ -8,6 +8,13 @@ import streamlit.components.v1 as components
 import random
 import openai
 import os
+from supabase import create_client, Client
+url: str = "https://pszefvosagdpzilocerq.supabase.co"
+key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzemVmdm9zYWdkcHppbG9jZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4ODU1NTIsImV4cCI6MjA2MDQ2MTU1Mn0.nRw_Ev8VGVf_PvnQZ5Lk10JPYg3jaJwUWkGCmNO03fA"
+supabase: Client = create_client(url, key)
+
+response = supabase.table("records").select("*").eq("place", "good").execute()
+print(response)
 
 # 音楽ファイルを base64 に変換
 def get_audio_base64(file_path):
@@ -29,6 +36,19 @@ spell_db = {
     "ぱるぷんて": {"level": 5, "exp": 72},
     "べホイミ": {"level": 8, "exp": 3}
 }
+
+response = {
+    "data": [
+        {
+            "id": 5,
+            "created_at": "2025-04-17T12:05:26.149548+00:00",
+            "url": "komeda",
+            "place": "good"
+        }
+    ],
+    "count": None
+}
+response
 
 # --- セッションステート初期化 ---
 def init_state():
