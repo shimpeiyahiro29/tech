@@ -6,13 +6,15 @@ import pydeck as pdk
 import base64
 import streamlit.components.v1 as components
 import random
-import openai
-import os
 from supabase import create_client, Client
 url: str = "https://pszefvosagdpzilocerq.supabase.co"
 key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzemVmdm9zYWdkcHppbG9jZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4ODU1NTIsImV4cCI6MjA2MDQ2MTU1Mn0.nRw_Ev8VGVf_PvnQZ5Lk10JPYg3jaJwUWkGCmNO03fA"
 
 supabase: Client = create_client(url, key)
+from openai import OpenAI
+
+# Streamlit secrets から直接 API キーを渡して初期化
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
@@ -100,9 +102,25 @@ def get_candidate_places_from_db():
         {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
     ])
 
-# --- 仮のAIコメント生成関数 ---
-def get_ai_recommendation(place):
-    return f"✨ {place} は、あなたの冒険心をくすぐる特別な場所です！"
+# --- AIコメント生成関数 ---
+@st.cache_data(show_spinner=False)
+def get_ai_recommendation(place: str) -> str:
+    """
+    place の名称を受け取り、ChatGPT に推薦コメントを生成させる。
+    キャッシュ付きなので連続呼び出しのコストを抑えられます。
+    """
+    messages = [
+        {"role": "system", "content": "あなたは旅行好きユーザー向けのレコメンドアシスタントです。"},
+        {"role": "user", "content": f"目的地「{place}」を訪れたくなる、日本語の短い推薦コメントを100文字以内でください。"}
+    ]
+    res = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        temperature=0.8,
+        max_tokens=120,
+    )
+    return res.choices[0].message.content.strip()
+
 
 # --- タイトルと説明 ---
 st.title("テック勇者リョヤカアプリ")
