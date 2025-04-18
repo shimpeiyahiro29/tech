@@ -37,15 +37,8 @@ def search_shops(mood,time):
     response = supabase.table("place").select("*").eq("mood", mood).eq("time", time).execute()
     return response.data 
 
-##shopDBからsearch_shopを使って店名を抽出する。
-search_mood = "カフェ" # 検索したい場所
-search_time = 30
-found_records = search_shops(search_mood,search_time)
-names = found_records[0]['name']
-url =  found_records[0]['url']
-lat =  found_records[0]['lat']
-lon =  found_records[0]['lon']
-print(names)
+
+
 
 
 ##経験値の合計値をtotal_expに格納する
@@ -154,11 +147,19 @@ if st.session_state.activated_spell and st.session_state.user_data:
     if st.button("🚀 冒険に出る"):
         with st.spinner("冒険先を探索中..."):
             time.sleep(1.5)
-        st.session_state.selected_time = time_choice
-        st.session_state.selected_mood = mood_choice
+        st.session_state.selected_time = time_choice###時間
+        st.session_state.selected_mood = mood_choice###ムード
         st.session_state.selected_location = location_choice
         st.session_state.place_chosen = False
         st.session_state.checkin_done = False
+        ##shopDBからsearch_shopを使って店名を抽出する。
+        search_mood = mood_choice # 検索したい場所
+        search_time = 30
+        found_records = search_shops(search_mood,search_time)
+        names = found_records[0]['name']
+        url =  found_records[0]['url']
+        lat =  found_records[0]['lat']
+        lon =  found_records[0]['lon']
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
