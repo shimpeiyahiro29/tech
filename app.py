@@ -14,7 +14,8 @@ key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 
 supabase: Client = create_client(url, key)
 
-##add_records("place","exp")を入れると、recordsに挿入される。
+##############################バックエンド側関数##############################
+##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
 def add_records(place,exp):
     data= {
         "place":place,
@@ -25,9 +26,42 @@ def add_records(place,exp):
 
 ##サンプル
 add_records("komeda",20)
-##records テーブルから全件選択してresponseに格納する
-response =supabase.table("records").select("*").execute()
 
+##recordsテーブルのplaceカラムから引数の内容で検索し、add_recordsに格納する
+def search_records(place):
+    response = supabase.table("records").select("*").eq("place", place).execute()
+    return response.data 
+
+##shopDBからmoodとtimeのカラムを参照して該当のデータを引っ張ってくる
+def search_shops(mood,time):
+    response = supabase.table("place").select("*").eq("mood", mood).eq("time", time).execute()
+    return response.data 
+
+##shopDBからsearch_shopを使って店名を抽出する。
+search_mood = "カフェ" # 検索したい場所
+search_time = 30
+found_records = search_shops(search_mood,search_time)
+names = found_records[0]['name']
+url =  found_records[0]['url']
+lat =  found_records[0]['lat']
+lon =  found_records[0]['lon']
+print(names)
+
+
+##経験値の合計値をtotal_expに格納する
+def exp_sum():
+    response = supabase.table("records").select("*").execute()
+    exp_values = [record['exp'] for record in response.data]
+    total_exp = sum(exp_values)
+    return total_exp
+total_exp =exp_sum()
+
+#経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
+now_lv= total_exp//100
+last_exp=100-(total_exp%100)
+
+
+##########################################################################################
 # 音楽ファイルを base64 に変換
 def get_audio_base64(file_path):
     with open(file_path, "rb") as f:
@@ -44,7 +78,7 @@ components.html(audio_html, height=50)
 
 # --- 仮のデータベース（ふっかつのじゅもん） ---
 spell_db = {
-    "ほいみ": {"level": 1, "exp": 12},
+    "ほいみ": {"level": now_lv, "exp": last_exp},#LVと経験値が正しく表示される。ユーザーの識別はできていない。
     "ぱるぷんて": {"level": 5, "exp": 72},
     "べホイミ": {"level": 8, "exp": 3}
 }
@@ -66,7 +100,7 @@ init_state()
 # --- 仮の候補地DB（緯度・経度含む） ---
 def get_candidate_places_from_db():
     return pd.DataFrame([
-        {"name": "博多駅前カフェ", "lat": 33.5902, "lon": 130.4203},
+        {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
         {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
         {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
         {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
