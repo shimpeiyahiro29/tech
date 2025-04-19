@@ -12,9 +12,10 @@ key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 
 supabase: Client = create_client(url, key)
 from openai import OpenAI
+OpenAI.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # Streamlit secrets から直接 API キーを渡して初期化
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
 
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
