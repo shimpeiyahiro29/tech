@@ -18,10 +18,11 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
-def add_records(place,exp):
+def add_records(place,exp,spell):
     data= {
         "place":place,
-        "exp":exp
+        "exp":exp,
+        "spell":spell
     }
     response = supabase.table("records").insert(data).execute()
     return response
@@ -246,7 +247,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
-            add_records(selected_place,10)
+            add_records(selected_place,10,spell)#recordsにチェックインで選んだ店名,経験値10,ふっかつの呪文を入れる
             st.markdown(f"🧪 経験値 +{gained_exp} EXP（現在 {new_exp} EXP）")
 
             if level_up:
