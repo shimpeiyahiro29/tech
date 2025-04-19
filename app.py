@@ -205,7 +205,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
     for i, row in df_places.iterrows():
         place = row["name"]
         st.markdown(f"**🏞️ {place}**")
-        #st.info(get_ai_recommendation(place))
+        st.info(get_ai_recommendation(place))
 
     st.markdown("### ✅ 上から目的地を選んでください")
     selected_place = st.radio("目的地を選択", df_places["name"].tolist(), key="selected_place", label_visibility="collapsed")
