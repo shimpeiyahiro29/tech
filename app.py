@@ -64,8 +64,6 @@ def calc_exp(place):
         exp = 20-5*(number_of_records)
     return exp
 
-#経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
-
 
 
 ##########################################################################################
@@ -263,6 +261,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
+            #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
             get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
             add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
             update_now_lv= exp_sum(spell)//100#チェックインした後の更新したレベルを計算
