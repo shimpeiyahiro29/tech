@@ -19,49 +19,52 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
-def add_records(place,exp):
+def add_records(place,exp,spell):
     data= {
         "place":place,
-        "exp":exp
+        "exp":exp,
+        "spell":spell
     }
     response = supabase.table("records").insert(data).execute()
     return response
 
-##サンプル
-add_records("komeda",20)
-
-##recordsテーブルのplaceカラムから引数の内容で検索し、add_recordsに格納する
-def search_records(place):
-    response = supabase.table("records").select("*").eq("place", place).execute()
-    return response.data 
 
 ##shopDBからmoodとtimeのカラムを参照して該当のデータを引っ張ってくる
 def search_shops(mood,time):
     response = supabase.table("place").select("*").eq("mood", mood).eq("time", time).execute()
     return response.data 
 
-##shopDBからsearch_shopを使って店名を抽出する。
-search_mood = "カフェ" # 検索したい場所
-search_time = 30 # 検索したい時間
-found_records = search_shops(search_mood,search_time)
-names = found_records[0]['name']
-url =  found_records[0]['url']
-lat =  found_records[0]['lat']
-lon =  found_records[0]['lon']
-print(names)
-
 
 ##経験値の合計値をtotal_expに格納する
-def exp_sum():
-    response = supabase.table("records").select("*").execute()
+def exp_sum(spell):
+    response = supabase.table("records").select("*").eq("spell", spell).execute()
     exp_values = [record['exp'] for record in response.data]
     total_exp = sum(exp_values)
     return total_exp
-total_exp =exp_sum()
 
-#経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
-now_lv= total_exp//100
-last_exp=100-(total_exp%100)
+
+##recordsからチェックインした名前の場所と同じ場所を抽出する
+def search_records(spell,place):
+    response = supabase.table("records").select("*").eq("spell", spell).eq("place", place).execute()
+    return response.data 
+
+##recordsから復活の呪文を使ってチェックイン履歴を取得する
+def get_records(spell):
+    response = supabase.table("records").select("*").eq("spell", spell).execute()
+    return response.data 
+
+
+##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
+##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
+def calc_exp(place):
+    found_records=search_records(st.session_state.activated_spell,place)
+    number_of_records = len(found_records)
+    if number_of_records >3:
+        exp =5
+    else:
+        exp = 20-5*(number_of_records)
+    return exp
+
 
 #--- supabase から呪文データを取得して辞書に格納する関数 ---
 def build_spell_db_from_supabase():
@@ -100,7 +103,7 @@ def play_bgm_on_mode_selection():
 
 
 # --- 勇者の画像＋ステータス表示（共通） ---
-def show_hero_status():
+def show_hero_status(spell):
     if st.session_state.activated_spell and st.session_state.user_data:
         data = st.session_state.user_data
         col1, col2 = st.columns([1, 2])
@@ -108,8 +111,11 @@ def show_hero_status():
             image = Image.open("yu-sya_image2.png")
             st.image(image, width=200)
         with col2:
-            st.markdown(f"### レベル：{data['level']}")
-            st.markdown(f"レベルアップまであと **{data['exp']} EXP**")
+            total_exp =exp_sum(spell)
+            now_lv= total_exp//100
+            last_exp=100-(total_exp%100)
+            st.markdown(f"### レベル：{now_lv}")
+            st.markdown(f"レベルアップまであと **{last_exp} EXP**")
             st.markdown("🗺️ 新しい冒険に出発しよう！")
 
 # --- データベース（ふっかつのじゅもん） ---
@@ -149,16 +155,17 @@ if st.session_state.show_awakening_message:
     st.success(st.session_state.awakening_message)
     st.session_state.show_awakening_message = False
 
+############################################################削除して良さそう############################################################
 # --- 仮の候補地DB（緯度・経度含む） ---
-def get_candidate_places_from_db():
-    return pd.DataFrame([
-        {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
-        {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
-        {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
-        {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
-        {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
-    ])
-
+# def get_candidate_places_from_db():
+#     return pd.DataFrame([
+#         {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
+#         {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
+#         {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
+#         {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
+#         {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
+#     ])
+########################################################################################################################
 # --- AIコメント生成関数 ---
 @st.cache_data(show_spinner=False)
 def get_ai_recommendation(place: str) -> str:
@@ -189,11 +196,13 @@ if st.session_state.mode is None:
             st.session_state.bgm_triggered = True
             st.rerun()  # 画面再描画して音再生へ
     with col2:
+
         if st.button("\U0001F501 自分の冒険を思い出す"):
             st.session_state.mode = "returning"
             st.session_state.bgm_triggered = True
             st.rerun() # 画面再描画して音再生へ
     st.stop()
+
 
 # モードが選ばれて、bgm_triggered が True のときのみ再生
 if st.session_state.bgm_triggered:
@@ -227,9 +236,22 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
             if new_spell:
                 def add_spell_to_status(new_spell):
                     data = {"spell": new_spell}
-                    response = supabase.table("status").insert(data).execute()
-                    return response
+                    # spellをDBに入れようとする。
+                    try: 
+                        response = supabase.table("status").insert(data).execute()
+                        return response
+                    # エラーが出た場合の分岐
+                    except Exception as e:
+                        # すでに存在している場合のエラー処理
+                        if hasattr(e, "args") and "duplicate key value violates unique constraint" in str(e.args[0]):
+                            st.error(f"じゅもん『{new_spell}』は　すでに使われています。別のじゅもんを考えてみてください。")
+                        else:
+                            st.error("じゅもんの登録中に予期せぬエラーが発生しました。もう一度試してみてください。")
+                        return None
+                
                 add_spell_to_status(new_spell)
+
+                
 
                 spell_db[new_spell] = {"level": 1, "exp": 0}
                 st.session_state.activated_spell = new_spell
@@ -305,10 +327,45 @@ if st.session_state.mode is None:
             st.session_state.activated_spell = spell
             st.session_state.user_data = spell_db[spell]
             st.success(f"『{spell}』勇者は　めをさました！")
+            
         else:
             st.session_state.activated_spell = None
             st.session_state.user_data = None
             st.error("その　じゅもんは　まちがっております")
+
+    
+# --- 冒険フロー（readyモード） ---
+if st.session_state.mode == "ready" and st.session_state.activated_spell:
+
+    # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
+    if st.session_state.show_awakening_message:
+        st.success(st.session_state.awakening_message)
+        st.session_state.show_awakening_message = False
+    
+
+    if not st.session_state.place_chosen:
+        show_hero_status(st.session_state.activated_spell)  # 勇者ステータス
+        st.markdown("---")
+        st.markdown("### 🕒 冒険の時間")
+        time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
+
+        st.markdown("### 🎭 冒険の気分")
+        mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
+
+        st.markdown("### 🏘️ 旅立ちの村")
+        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
+
+        if st.button("🚀 冒険に出る"):
+            with st.spinner("冒険先を探索中..."):
+                time.sleep(1.5)
+            st.session_state.selected_time = time_choice
+            st.session_state.selected_mood = mood_choice
+            st.session_state.selected_location = location_choice
+            st.session_state.place_chosen = True
+            st.success("冒険スタート！")
+            st.rerun()
+            search_mood = st.session_state.selected_mood # 検索したい場所
+            search_time = 30
 
 
 # --- 冒険フロー（readyモード） ---
@@ -345,7 +402,7 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = get_candidate_places_from_db()
+    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,30)) 
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
@@ -364,8 +421,8 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
         st.pydeck_chart(pdk.Deck(
             map_style='mapbox://styles/mapbox/streets-v12',
             initial_view_state=pdk.ViewState(
-                latitude=selected_df["lat"].values[0],
-                longitude=selected_df["lon"].values[0],
+                latitude=float(selected_df["lat"].values[0]),
+                longitude=float(selected_df["lon"].values[0]),
                 zoom=14,
                 pitch=30,
             ),
@@ -394,7 +451,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
                 new_level += 1
                 level_up = True
 
-            # 経験値とレベルを更新
+            # 経験値とレベルを更新　
             st.session_state.user_data["exp"] = new_exp
             st.session_state.user_data["level"] = new_level
             st.session_state.checkin_done = True
@@ -411,22 +468,31 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
-            st.markdown(f"🧪 経験値 +{gained_exp} EXP（現在 {new_exp} EXP）")
+            #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
+            get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
+            add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
+            update_now_lv= exp_sum(st.session_state.activated_spell)//100#チェックインした後の更新したレベルを計算
+            last_exp=(exp_sum(st.session_state.activated_spell)%100)#チェックインした後の更新した経験値を計算
+            
+            st.markdown(f"🧪 経験値 +{get_exp} EXP（現在の経験値 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
-            if level_up:
-                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
-            else:
-                st.markdown(f"📊 現在のレベル：{new_level}")
+            # if level_up:
+            #     st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
+            # else:
+            #     st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
-            if level_up:
-                st.balloons()  # 🎈 この1行をここに追加！
-                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
+            total_exp =exp_sum(st.session_state.activated_spell)
+            now_lv= total_exp//100
+            if now_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
+                st.markdown(f"📊 現在のレベル：{update_now_lv}")
+                
             else:                    
-                st.markdown(f"📊 現在のレベル：{new_level}")
+                st.balloons()  # 🎈 この1行をここに追加！
+                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
 
 # --- 履歴表示 ---
 if st.session_state.checkin_history:
     st.markdown("---")
     st.markdown("### 📚 チェックイン履歴")
-    df_history = pd.DataFrame(st.session_state.checkin_history)
-    st.dataframe(df_history)
+    df_history = pd.DataFrame(get_records (st.session_state.activated_spell))
+    st.dataframe(df_history[["created_at","place"]])
