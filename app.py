@@ -233,9 +233,22 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
             if new_spell:
                 def add_spell_to_status(new_spell):
                     data = {"spell": new_spell}
-                    response = supabase.table("status").insert(data).execute()
-                    return response
+                    # spellをDBに入れようとする。
+                    try: 
+                        response = supabase.table("status").insert(data).execute()
+                        return response
+                    # エラーが出た場合の分岐
+                    except Exception as e:
+                        # すでに存在している場合のエラー処理
+                        if hasattr(e, "args") and "duplicate key value violates unique constraint" in str(e.args[0]):
+                            st.error(f"じゅもん『{new_spell}』は　すでに使われています。別のじゅもんを考えてみてください。")
+                        else:
+                            st.error("じゅもんの登録中に予期せぬエラーが発生しました。もう一度試してみてください。")
+                        return None
+                
                 add_spell_to_status(new_spell)
+
+                
 
                 spell_db[new_spell] = {"level": 1, "exp": 0}
                 st.session_state.activated_spell = new_spell
