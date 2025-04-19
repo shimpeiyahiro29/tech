@@ -75,7 +75,7 @@ def build_spell_db_from_supabase():
 
 ################ベース設定####################
 
-# 音楽ファイルを base64 に変換
+# 音楽ファイルを base64 に変換します
 def get_audio_base64(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
