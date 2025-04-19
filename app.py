@@ -65,42 +65,92 @@ def calc_exp(place):
     return exp
 
 
+#--- supabase から呪文データを取得して辞書に格納する関数 ---
+def build_spell_db_from_supabase():
+    response = supabase.table("status").select("spell").execute()
+    spell_list = response.data
 
-##########################################################################################
-# 音楽ファイルを base64 に変換
+    spell_db = {}
+    for item in spell_list:
+        spell_name = item["spell"]
+        spell_db[spell_name] = {"level": 1, "exp": 0}
+    return spell_db
+
+################ベース設定####################
+
+# 音楽ファイルを base64 に変換します
 def get_audio_base64(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-# 再生ボタンだけのHTMLを構築
-audio_base64 = get_audio_base64("bgm1.mp3")
-audio_html = f"""
-<audio id="bgm" src="data:audio/mp3;base64,{audio_base64}"></audio>
-<button onclick="document.getElementById('bgm').play()" style="font-size:18px; padding:5px 15px;">▶️ BGM再生</button>
-"""
-components.html(audio_html, height=50)
+# BGM をモード選択時に再生する関数
+def play_bgm_on_mode_selection():
+    audio_base64 = get_audio_base64("bgm1.mp3")
+    audio_html = f"""
+    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay loop></audio>
+    <script>
+        var audio = document.getElementById('bgm');
+        if (audio) {{
+            audio.volume = 0.2;
+            audio.play();
+        }}
+    </script>
+    """
+    components.html(audio_html, height=0)
 
-# --- 仮のデータベース（ふっかつのじゅもん） ---
-spell_db = {
-    "ほいみ": {"level": 5, "exp": 5},#LVと経験値が正しく表示される。ユーザーの識別はできていない。
-    "ぱるぷんて": {"level": 5, "exp": 72},
-    "べホイミ": {"level": 8, "exp": 3}
-}
+
+# --- 勇者の画像＋ステータス表示（共通） ---
+def show_hero_status():
+    if st.session_state.activated_spell and st.session_state.user_data:
+        data = st.session_state.user_data
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            image = Image.open("yu-sya_image2.png")
+            st.image(image, width=200)
+        with col2:
+            total_exp =exp_sum(spell)
+            now_lv= total_exp//100
+            last_exp=100-(total_exp%100)
+            st.markdown(f"### レベル：{now_lv}")
+            st.markdown(f"レベルアップまであと **{last_exp} EXP**")
+            st.markdown("🗺️ 新しい冒険に出発しよう！")
+
+# --- データベース（ふっかつのじゅもん） ---
+spell_db = build_spell_db_from_supabase()
 
 # --- セッションステート初期化 ---
-def init_state():
-    st.session_state.setdefault("activated_spell", None)
-    st.session_state.setdefault("user_data", None)
-    st.session_state.setdefault("selected_time", None)
-    st.session_state.setdefault("selected_mood", None)
-    st.session_state.setdefault("selected_location", None)
-    st.session_state.setdefault("selected_place", None)
-    st.session_state.setdefault("place_chosen", False)
-    st.session_state.setdefault("checkin_done", False)
-    st.session_state.setdefault("checkin_history", [])
+def init_session_state():
+    keys_and_defaults = {
+        "mode": None,
+        "activated_spell": None,
+        "user_data": None,
+        "awakening_message": "",
+        "show_awakening_message": False,
+        "spell_checked": False,
+        "spell_valid": False,
+        "spell_last_input": "",
+        "selected_time": None,
+        "selected_mood": None,
+        "selected_location": None,
+        "place_chosen": False,
+        "checkin_done": False,
+        "checkin_history": [],
+        "new_spell_ready": False
+    }
+    for key, default in keys_and_defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = default
 
-init_state()
+init_session_state()
+
+# --- UI表示系 ---
+st.title("テック勇者リョヤカアプリ")
+st.caption("気分と時間に合わせて冒険の旅を提案します。まちを旅して勇者を育てよう！")
+
+if st.session_state.show_awakening_message:
+    st.success(st.session_state.awakening_message)
+    st.session_state.show_awakening_message = False
 
 ############################################################削除して良さそう############################################################
 # --- 仮の候補地DB（緯度・経度含む） ---
@@ -133,67 +183,172 @@ def get_ai_recommendation(place: str) -> str:
     return res.choices[0].message.content.strip()
 
 
-# --- タイトルと説明 ---
-st.title("テック勇者リョヤカアプリ")
-st.caption("テック勇者リョヤカアプリは、あなたの質問に答えるためのアプリです。")
-
-# --- ふっかつのじゅもん入力 ---
-st.markdown("### ふっかつのじゅもん")
-spell = st.text_input(" ", placeholder="じゅもんを入力してください", label_visibility="collapsed")
-
-if st.button("唱える"):
-    if spell in spell_db:
-        st.session_state.activated_spell = spell
-        st.session_state.user_data = spell_db[spell]
-        st.success(f"『{spell}』勇者は　めをさました！")
-    else:
-        st.session_state.activated_spell = None
-        st.session_state.user_data = None
-        st.error("その　じゅもんは　まちがっております")
-
-# --- 呪文が唱えられた後の処理 ---
-if st.session_state.activated_spell and st.session_state.user_data:
-    data = st.session_state.user_data
-    col1, col2 = st.columns([1, 2])
+# --- モード選択(初回) ---
+if st.session_state.mode is None:
+    st.markdown("## あなたの冒険を選んでください")
+    col1, col2 = st.columns(2)
     with col1:
-        image = Image.open("yu-sya_image2.png")
-        st.image(image, width=200)
+        if st.button("\U0001F331 新しい冒険をはじめる"):
+            st.session_state.mode = "new"
+            st.session_state.bgm_triggered = True
+            st.rerun()  # 画面再描画して音再生へ
     with col2:
-        total_exp =exp_sum(spell)
-        now_lv= total_exp//100
-        last_exp=100-(total_exp%100)
 
-        st.markdown(f"### レベル：{now_lv}")
-        st.markdown(f"レベルアップまであと **{last_exp} EXP**")
-        st.markdown("🗺️ 新しい冒険に出発しよう！")
+        if st.button("\U0001F501 自分の冒険を思い出す"):
+            st.session_state.mode = "returning"
+            st.session_state.bgm_triggered = True
+            st.rerun() # 画面再描画して音再生へ
+    st.stop()
 
-    st.markdown("---")
-    st.markdown("### 🕒 冒険の時間")
-    time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, label_visibility="collapsed")
 
-    st.markdown("### 🎭 冒険の気分")
-    mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, label_visibility="collapsed")
+# モードが選ばれて、bgm_triggered が True のときのみ再生
+if st.session_state.bgm_triggered:
+    play_bgm_on_mode_selection()
+    st.session_state.bgm_triggered = False  # 一度だけ再生
 
-    st.markdown("### 🏘️ 旅立ちの村")
-    location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, label_visibility="collapsed")
+# --- 新しい冒険 ---
+if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
 
-    if st.button("🚀 冒険に出る"):
-        with st.spinner("冒険先を探索中..."):
-            time.sleep(1.5)
-        st.session_state.selected_time = time_choice###時間
-        st.session_state.selected_mood = mood_choice###ムード
-        st.session_state.selected_location = location_choice
-        st.session_state.place_chosen = False
-        st.session_state.checkin_done = False
-        ##shopDBからsearch_shopを使って店名を抽出する。
+    if st.session_state.activated_spell:
+        # 再入力を省略して自動登録
+        new_spell = st.session_state.activated_spell
+
+        def add_spell_to_status(new_spell):
+            data = {"spell": new_spell}
+            response = supabase.table("status").insert(data).execute()
+            return response
+        add_spell_to_status(new_spell)
+
+        spell_db[new_spell] = {"level": 1, "exp": 0}
+        st.session_state.user_data = spell_db[new_spell]
+        st.session_state.new_spell_ready = True
+        st.success(f"『{new_spell}』 勇者は　うまれた！")
+        st.stop()
+
+    else:
+        st.markdown("### あなたの ふっかつのじゅもん を入力してください")
+        new_spell = st.text_input("新しいじゅもん", placeholder="例：ほいみ", key="new_spell")
+
+        if st.button("このじゅもんで冒険を始める"):
+            if new_spell:
+                def add_spell_to_status(new_spell):
+                    data = {"spell": new_spell}
+                    response = supabase.table("status").insert(data).execute()
+                    return response
+                add_spell_to_status(new_spell)
+
+                spell_db[new_spell] = {"level": 1, "exp": 0}
+                st.session_state.activated_spell = new_spell
+                st.session_state.user_data = spell_db[new_spell]
+                st.session_state.new_spell_ready = True
+                st.success(f"『{new_spell}』 勇者は　うまれた！")
+                st.session_state.mode = "ready"
+                st.rerun() 
+                st.stop()
+            else:
+                st.error("じゅもんを入力してください")
+        st.stop()
     
-    search_mood = mood_choice # 検索したい場所
-    search_time = 30
-    # found_records = pd.DataFrame(search_shops(search_mood,search_time))
-    # names = found_records["name"].values[0]
-    # url =  found_records['url'].values[0]
-    # lat =  found_records['lat'].values[0]
-    # lon =  found_records['lon'].values[0]
+# --- 「うまれた」あとの処理 ---
+if st.session_state.mode == "new" and st.session_state.new_spell_ready:
+    st.session_state.awakening_message = f"『{st.session_state.activated_spell}』 勇者は　うまれた！"
+    st.session_state.show_awakening_message = True
+    st.session_state.new_spell_ready = False
+    st.session_state.mode = "ready"
+    st.rerun()
+
+
+# --- 冒険フロー（readyモード） ---
+if st.session_state.mode == "ready" and st.session_state.activated_spell:
+
+    # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
+    if st.session_state.show_awakening_message:
+        st.success(st.session_state.awakening_message)
+        st.session_state.show_awakening_message = False
+
+    show_hero_status()  # 勇者ステータス
+
+    if not st.session_state.place_chosen:
+        st.markdown("---")
+        st.markdown("### 🕒 冒険の時間")
+        time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
+
+        st.markdown("### 🎭 冒険の気分")
+        mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
+
+        st.markdown("### 🏘️ 旅立ちの村")
+        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
+
+        if st.button("🚀 冒険に出る"):
+            with st.spinner("冒険先を探索中..."):
+                time.sleep(1.5)
+            st.session_state.selected_time = time_choice
+            st.session_state.selected_mood = mood_choice
+            st.session_state.selected_location = location_choice
+            st.session_state.place_chosen = True
+            st.success("冒険スタート！")
+            st.rerun()
+            search_mood = mood_choice # 検索したい場所
+            search_time = 30
+
+
+# --- 自分の冒険を思い出す(ふっかつのじゅもん) ---
+if st.session_state.mode == "returning":
+    st.markdown("### ふっかつのじゅもん")
+    spell = st.text_input(" ", placeholder="じゅもんを入力してください", label_visibility="collapsed", key="spell_input_returning")
+
+    if st.button("唱える"):
+        spell_db = build_spell_db_from_supabase()
+
+        st.session_state.spell_checked = True
+        st.session_state.spell_last_input = spell
+
+        if spell in spell_db:
+            st.session_state.spell_valid = True
+            st.session_state.activated_spell = spell
+            st.session_state.user_data = spell_db[spell]
+            st.session_state.awakening_message = f"『{spell}』勇者は　めをさました！"
+            st.session_state.show_awakening_message = True
+            st.session_state.mode = "ready"
+            st.rerun()
+        else:
+            st.session_state.spell_valid = False
+            st.session_state.activated_spell = None
+            st.session_state.user_data = None
+            st.error("その　じゅもんは　まちがっております")
+
+    if st.session_state.spell_checked and not st.session_state.spell_valid:
+        if st.button("このじゅもんで新しい冒険を始める"):
+            # Supabaseに追加
+            def add_spell_to_status(new_spell):
+                data = {"spell": new_spell}
+                response = supabase.table("status").insert(data).execute()
+                return response
+
+            add_spell_to_status(st.session_state.spell_last_input)
+
+            st.session_state.mode = "ready"
+            st.session_state.activated_spell = st.session_state.spell_last_input
+            st.session_state.user_data = {"level": 1, "exp": 0}
+            st.session_state.awakening_message = f"『{st.session_state.activated_spell}』勇者は　めをさました！"
+            st.session_state.show_awakening_message = True
+            st.rerun()
+
+# --- モード選択前（最初の画面）のときだけ表示したい部分を条件で囲う ---
+if st.session_state.mode is None:
+    st.markdown("### ふっかつのじゅもん")
+    spell = st.text_input(" ", placeholder="じゅもんを入力してください", label_visibility="collapsed", key="spell_input_main")
+
+    if st.button("唱える"):
+        if spell in spell_db:
+            st.session_state.activated_spell = spell
+            st.session_state.user_data = spell_db[spell]
+            st.success(f"『{spell}』勇者は　めをさました！")
+        else:
+            st.session_state.activated_spell = None
+            st.session_state.user_data = None
+            st.error("その　じゅもんは　まちがっております")
+
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
@@ -210,7 +365,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
 
     if selected_place:
         st.session_state.place_chosen = True
-        st.markdown("🏃 がんばって目的地までいこう！")
+        
 
         selected_df = df_places[df_places["name"] == selected_place]
         st.pydeck_chart(pdk.Deck(
@@ -231,6 +386,8 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
                 ),
             ]
         ))
+
+        st.markdown("冒険を終えたら、チェックインしてください！")
 
         if st.button("✅ チェックイン"):
             gained_exp = 20
