@@ -56,7 +56,7 @@ def get_records(spell):
 ##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
 ##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
 def calc_exp(place):
-    found_records=search_records(spell,place)
+    found_records=search_records(st.session_state.activated_spell,place)
     number_of_records = len(found_records)
     if number_of_records >3:
         exp =5
@@ -101,7 +101,7 @@ def play_bgm_on_mode_selection():
 
 
 # --- 勇者の画像＋ステータス表示（共通） ---
-def show_hero_status():
+def show_hero_status(spell):
     if st.session_state.activated_spell and st.session_state.user_data:
         data = st.session_state.user_data
         col1, col2 = st.columns([1, 2])
@@ -258,39 +258,6 @@ if st.session_state.mode == "new" and st.session_state.new_spell_ready:
     st.rerun()
 
 
-# --- 冒険フロー（readyモード） ---
-if st.session_state.mode == "ready" and st.session_state.activated_spell:
-
-    # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
-    if st.session_state.show_awakening_message:
-        st.success(st.session_state.awakening_message)
-        st.session_state.show_awakening_message = False
-
-    show_hero_status()  # 勇者ステータス
-
-    if not st.session_state.place_chosen:
-        st.markdown("---")
-        st.markdown("### 🕒 冒険の時間")
-        time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
-
-        st.markdown("### 🎭 冒険の気分")
-        mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
-
-        st.markdown("### 🏘️ 旅立ちの村")
-        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
-
-        if st.button("🚀 冒険に出る"):
-            with st.spinner("冒険先を探索中..."):
-                time.sleep(1.5)
-            st.session_state.selected_time = time_choice
-            st.session_state.selected_mood = mood_choice
-            st.session_state.selected_location = location_choice
-            st.session_state.place_chosen = True
-            st.success("冒険スタート！")
-            st.rerun()
-            search_mood = mood_choice # 検索したい場所
-            search_time = 30
-
 
 # --- 自分の冒険を思い出す(ふっかつのじゅもん) ---
 if st.session_state.mode == "returning":
@@ -344,15 +311,50 @@ if st.session_state.mode is None:
             st.session_state.activated_spell = spell
             st.session_state.user_data = spell_db[spell]
             st.success(f"『{spell}』勇者は　めをさました！")
+            
         else:
             st.session_state.activated_spell = None
             st.session_state.user_data = None
             st.error("その　じゅもんは　まちがっております")
 
+    
+# --- 冒険フロー（readyモード） ---
+if st.session_state.mode == "ready" and st.session_state.activated_spell:
+
+    # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
+    if st.session_state.show_awakening_message:
+        st.success(st.session_state.awakening_message)
+        st.session_state.show_awakening_message = False
+    
+
+    if not st.session_state.place_chosen:
+        show_hero_status(st.session_state.activated_spell)  # 勇者ステータス
+        st.markdown("---")
+        st.markdown("### 🕒 冒険の時間")
+        time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
+
+        st.markdown("### 🎭 冒険の気分")
+        mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
+
+        st.markdown("### 🏘️ 旅立ちの村")
+        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
+
+        if st.button("🚀 冒険に出る"):
+            with st.spinner("冒険先を探索中..."):
+                time.sleep(1.5)
+            st.session_state.selected_time = time_choice
+            st.session_state.selected_mood = mood_choice
+            st.session_state.selected_location = location_choice
+            st.session_state.place_chosen = True
+            st.success("冒険スタート！")
+            st.rerun()
+            search_mood = st.session_state.selected_mood # 検索したい場所
+            search_time = 30
+
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = pd.DataFrame(search_shops(search_mood,search_time)) 
+    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,30)) 
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
@@ -420,9 +422,9 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.success(f"🎉 {selected_place} にチェックインしました！")
             #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
             get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
-            add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
-            update_now_lv= exp_sum(spell)//100#チェックインした後の更新したレベルを計算
-            last_exp=(total_exp%100)#チェックインした後の更新した経験値を計算
+            add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
+            update_now_lv= exp_sum(st.session_state.activated_spell)//100#チェックインした後の更新したレベルを計算
+            last_exp=(exp_sum(st.session_state.activated_spell)%100)#チェックインした後の更新した経験値を計算
             
             st.markdown(f"🧪 経験値 +{get_exp} EXP（現在の経験値 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
@@ -431,6 +433,8 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             # else:
             #     st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
+            total_exp =exp_sum(st.session_state.activated_spell)
+            now_lv= total_exp//100
             if now_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
                 st.markdown(f"📊 現在のレベル：{update_now_lv}")
                 
@@ -442,5 +446,5 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
 if st.session_state.checkin_history:
     st.markdown("---")
     st.markdown("### 📚 チェックイン履歴")
-    df_history = pd.DataFrame(get_records (spell))
+    df_history = pd.DataFrame(get_records (st.session_state.activated_spell))
     st.dataframe(df_history[["created_at","place"]])
