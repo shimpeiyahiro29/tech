@@ -115,18 +115,6 @@ def show_hero_status():
 # --- データベース（ふっかつのじゅもん） ---
 spell_db = build_spell_db_from_supabase()
 
-response = {
-    "data": [
-        {
-            "id": 5,
-            "created_at": "2025-04-17T12:05:26.149548+00:00",
-            "url": "komeda",
-            "place": "good"
-        }
-    ],
-    "count": None
-}
-response
 
 # --- セッションステート初期化 ---
 def init_session_state():
@@ -264,37 +252,6 @@ if st.session_state.mode == "new" and st.session_state.new_spell_ready:
     st.rerun()
 
 
-# --- 冒険フロー（readyモード） ---
-if st.session_state.mode == "ready" and st.session_state.activated_spell:
-
-    # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
-    if st.session_state.show_awakening_message:
-        st.success(st.session_state.awakening_message)
-        st.session_state.show_awakening_message = False
-
-    show_hero_status()  # 勇者ステータス
-
-    if not st.session_state.place_chosen:
-        st.markdown("---")
-        st.markdown("### 🕒 冒険の時間")
-        time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
-
-        st.markdown("### 🎭 冒険の気分")
-        mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
-
-        st.markdown("### 🏘️ 旅立ちの村")
-        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
-
-        if st.button("🚀 冒険に出る"):
-            with st.spinner("冒険先を探索中..."):
-                time.sleep(1.5)
-            st.session_state.selected_time = time_choice
-            st.session_state.selected_mood = mood_choice
-            st.session_state.selected_location = location_choice
-            st.session_state.place_chosen = True
-            st.success("冒険スタート！")
-            st.rerun()
-
 
 # --- 自分の冒険を思い出す(ふっかつのじゅもん) ---
 if st.session_state.mode == "returning":
@@ -352,6 +309,38 @@ if st.session_state.mode is None:
             st.session_state.activated_spell = None
             st.session_state.user_data = None
             st.error("その　じゅもんは　まちがっております")
+
+
+# --- 冒険フロー（readyモード） ---
+if st.session_state.mode == "ready" and st.session_state.activated_spell:
+
+    # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
+    if st.session_state.show_awakening_message:
+        st.success(st.session_state.awakening_message)
+        st.session_state.show_awakening_message = False
+
+    show_hero_status()  # 勇者ステータス
+
+    if not st.session_state.place_chosen:
+        st.markdown("---")
+        st.markdown("### 🕒 冒険の時間")
+        time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
+
+        st.markdown("### 🎭 冒険の気分")
+        mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
+
+        st.markdown("### 🏘️ 旅立ちの村")
+        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
+
+        if st.button("🚀 冒険に出る"):
+            with st.spinner("冒険先を探索中..."):
+                time.sleep(1.5)
+            st.session_state.selected_time = time_choice
+            st.session_state.selected_mood = mood_choice
+            st.session_state.selected_location = location_choice
+            st.session_state.place_chosen = True
+            st.success("冒険スタート！")
+            st.rerun()
 
 
 # --- 候補地表示 ---
