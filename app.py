@@ -41,9 +41,6 @@ def search_shops(mood,time):
     return response.data 
 
 
-
-
-
 ##経験値の合計値をtotal_expに格納する
 def exp_sum():
     response = supabase.table("records").select("*").execute()
@@ -51,6 +48,24 @@ def exp_sum():
     total_exp = sum(exp_values)
     return total_exp
 total_exp =exp_sum()
+
+
+def search_records(place):
+    response = supabase.table("records").select("*").eq("place", place).execute()
+    return response.data 
+
+##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
+##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
+def calc_exp(place):
+    found_records=search_records(place)
+    number_of_records = len(found_records)
+    if number_of_records >3:
+        exp =5
+    else:
+        exp = 20-5*(number_of_records)
+    return exp
+
+
 
 #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
 now_lv= total_exp//100
@@ -247,13 +262,15 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
-            add_records(selected_place,10,spell)#recordsにチェックインで選んだ店名,経験値10,ふっかつの呪文を入れる
-            st.markdown(f"🧪 経験値 +{gained_exp} EXP（現在 {new_exp} EXP）")
+            get_exp=calc_exp(selected_place)
+            add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値10,ふっかつの呪文を入れる
+            
+            st.markdown(f"🧪 経験値 +{get_exp} EXP（現在 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
             if level_up:
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
             else:
-                st.markdown(f"📊 現在のレベル：{new_level}")
+                st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
             if level_up:
                 st.balloons()  # 🎈 この1行をここに追加！
