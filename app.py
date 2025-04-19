@@ -27,7 +27,7 @@ def add_records(place,exp):
     return response
 
 ##サンプル
-add_records("komeda",20)
+#add_records("komeda",20)
 
 ##recordsテーブルのplaceカラムから引数の内容で検索し、add_recordsに格納する
 def search_records(place):
@@ -171,13 +171,14 @@ if st.session_state.activated_spell and st.session_state.user_data:
         st.session_state.place_chosen = False
         st.session_state.checkin_done = False
         ##shopDBからsearch_shopを使って店名を抽出する。
-        search_mood = mood_choice # 検索したい場所
-        search_time = 30
-        found_records = search_shops(search_mood,search_time)
-        names = found_records[0]['name']
-        url =  found_records[0]['url']
-        lat =  found_records[0]['lat']
-        lon =  found_records[0]['lon']
+    
+    search_mood = mood_choice # 検索したい場所
+    search_time = 30
+    found_records = search_shops(search_mood,search_time)
+    names = found_records[0]['name']
+    url =  found_records[0]['url']
+    lat =  found_records[0]['lat']
+    lon =  found_records[0]['lon']
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
@@ -245,6 +246,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
+            add_records(selected_place,10)
             st.markdown(f"🧪 経験値 +{gained_exp} EXP（現在 {new_exp} EXP）")
 
             if level_up:
