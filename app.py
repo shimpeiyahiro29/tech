@@ -265,7 +265,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             get_exp=calc_exp(selected_place)
             add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値10,ふっかつの呪文を入れる
             
-            st.markdown(f"🧪 経験値 +{get_exp} EXP（現在 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
+            st.markdown(f"🧪 経験値 +{get_exp} EXP（次のレベルまで {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
             if level_up:
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
