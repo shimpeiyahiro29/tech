@@ -47,6 +47,11 @@ def search_records(spell,place):
     response = supabase.table("records").select("*").eq("spell", spell).eq("place", place).execute()
     return response.data 
 
+##recordsから復活の呪文を使ってチェックイン履歴を取得する
+def get_records(spell):
+    response = supabase.table("records").select("*").eq("spell", spell).execute()
+    return response.data 
+
 
 ##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
 ##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
@@ -200,7 +205,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
     for i, row in df_places.iterrows():
         place = row["name"]
         st.markdown(f"**🏞️ {place}**")
-        st.info(get_ai_recommendation(place))
+        #st.info(get_ai_recommendation(place))
 
     st.markdown("### ✅ 上から目的地を選んでください")
     selected_place = st.radio("目的地を選択", df_places["name"].tolist(), key="selected_place", label_visibility="collapsed")
@@ -241,7 +246,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
                 new_level += 1
                 level_up = True
 
-            # 経験値とレベルを更新
+            # 経験値とレベルを更新　
             st.session_state.user_data["exp"] = new_exp
             st.session_state.user_data["level"] = new_level
             st.session_state.checkin_done = True
@@ -258,27 +263,28 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
-            get_exp=calc_exp(selected_place)
-            add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値10,ふっかつの呪文を入れる
-            now_lv= total_exp//100
-            last_exp=100-(total_exp%100)
+            get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
+            add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
+            update_now_lv= exp_sum(spell)//100#チェックインした後の更新したレベルを計算
+            last_exp=(total_exp%100)#チェックインした後の更新した経験値を計算
             
-            st.markdown(f"🧪 経験値 +{get_exp} EXP（次のレベルまで {last_exp-get_exp } EXP）")####DBを参照して、チェックイン後のレベルを表示する
+            st.markdown(f"🧪 経験値 +{get_exp} EXP（現在の経験値 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
-            if level_up:
-                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
-            else:
-                st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
+            # if level_up:
+            #     st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
+            # else:
+            #     st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
-            if level_up:
-                st.balloons()  # 🎈 この1行をここに追加！
-                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
+            if now_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
+                st.markdown(f"📊 現在のレベル：{update_now_lv}")
+                
             else:                    
-                st.markdown(f"📊 現在のレベル：{new_level}")
+                st.balloons()  # 🎈 この1行をここに追加！
+                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
 
 # --- 履歴表示 ---
 if st.session_state.checkin_history:
     st.markdown("---")
     st.markdown("### 📚 チェックイン履歴")
-    df_history = pd.DataFrame(st.session_state.checkin_history)
-    st.dataframe(df_history)
+    df_history = pd.DataFrame(get_records (spell))
+    st.dataframe(df_history[["created_at","place"]])
