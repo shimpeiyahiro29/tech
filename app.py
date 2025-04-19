@@ -27,13 +27,6 @@ def add_records(place,exp,spell):
     response = supabase.table("records").insert(data).execute()
     return response
 
-##サンプル
-#add_records("komeda",20)
-
-##recordsテーブルのplaceカラムから引数の内容で検索し、add_recordsに格納する
-def search_records(place):
-    response = supabase.table("records").select("*").eq("place", place).execute()
-    return response.data 
 
 ##shopDBからmoodとtimeのカラムを参照して該当のデータを引っ張ってくる
 def search_shops(mood,time):
@@ -50,22 +43,22 @@ def exp_sum():
 total_exp =exp_sum()
 
 
-def search_records(place):
-    response = supabase.table("records").select("*").eq("place", place).execute()
+##recordsからチェックインした名前の場所と同じ場所を抽出する
+def search_records(spell,place):
+    response = supabase.table("records").select("*").eq("spell", spell).eq("place", place).execute()
     return response.data 
+
 
 ##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
 ##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
 def calc_exp(place):
-    found_records=search_records(place)
+    found_records=search_records(spell,place)
     number_of_records = len(found_records)
     if number_of_records >3:
         exp =5
     else:
         exp = 20-5*(number_of_records)
     return exp
-
-
 
 #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
 now_lv= total_exp//100
@@ -108,16 +101,17 @@ def init_state():
 
 init_state()
 
+############################################################削除して良さそう############################################################
 # --- 仮の候補地DB（緯度・経度含む） ---
-def get_candidate_places_from_db():
-    return pd.DataFrame([
-        {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
-        {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
-        {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
-        {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
-        {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
-    ])
-
+# def get_candidate_places_from_db():
+#     return pd.DataFrame([
+#         {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
+#         {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
+#         {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
+#         {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
+#         {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
+#     ])
+########################################################################################################################
 # --- AIコメント生成関数 ---
 @st.cache_data(show_spinner=False)
 def get_ai_recommendation(place: str) -> str:
@@ -190,15 +184,15 @@ if st.session_state.activated_spell and st.session_state.user_data:
     
     search_mood = mood_choice # 検索したい場所
     search_time = 30
-    found_records = search_shops(search_mood,search_time)
-    names = found_records[0]['name']
-    url =  found_records[0]['url']
-    lat =  found_records[0]['lat']
-    lon =  found_records[0]['lon']
+    # found_records = pd.DataFrame(search_shops(search_mood,search_time))
+    # names = found_records["name"].values[0]
+    # url =  found_records['url'].values[0]
+    # lat =  found_records['lat'].values[0]
+    # lon =  found_records['lon'].values[0]
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = get_candidate_places_from_db()
+    df_places = pd.DataFrame(search_shops(search_mood,search_time)) 
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
@@ -217,8 +211,8 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
         st.pydeck_chart(pdk.Deck(
             map_style='mapbox://styles/mapbox/streets-v12',
             initial_view_state=pdk.ViewState(
-                latitude=selected_df["lat"].values[0],
-                longitude=selected_df["lon"].values[0],
+                latitude=float(selected_df["lat"].values[0]),
+                longitude=float(selected_df["lon"].values[0]),
                 zoom=14,
                 pitch=30,
             ),
@@ -264,6 +258,8 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.success(f"🎉 {selected_place} にチェックインしました！")
             get_exp=calc_exp(selected_place)
             add_records(selected_place,get_exp,spell)#recordsにチェックインで選んだ店名,経験値10,ふっかつの呪文を入れる
+            now_lv= total_exp//100
+            last_exp=100-(total_exp%100)
             
             st.markdown(f"🧪 経験値 +{get_exp} EXP（次のレベルまで {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
