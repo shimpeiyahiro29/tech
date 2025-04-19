@@ -35,12 +35,11 @@ def search_shops(mood,time):
 
 
 ##経験値の合計値をtotal_expに格納する
-def exp_sum():
-    response = supabase.table("records").select("*").execute()
+def exp_sum(spell):
+    response = supabase.table("records").select("*").eq("spell", spell).execute()
     exp_values = [record['exp'] for record in response.data]
     total_exp = sum(exp_values)
     return total_exp
-total_exp =exp_sum()
 
 
 ##recordsからチェックインした名前の場所と同じ場所を抽出する
@@ -61,8 +60,7 @@ def calc_exp(place):
     return exp
 
 #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
-now_lv= total_exp//100
-last_exp=100-(total_exp%100)
+
 
 
 ##########################################################################################
@@ -82,7 +80,7 @@ components.html(audio_html, height=50)
 
 # --- 仮のデータベース（ふっかつのじゅもん） ---
 spell_db = {
-    "ほいみ": {"level": now_lv, "exp": last_exp},#LVと経験値が正しく表示される。ユーザーの識別はできていない。
+    "ほいみ": {"level": 5, "exp": 5},#LVと経験値が正しく表示される。ユーザーの識別はできていない。
     "ぱるぷんて": {"level": 5, "exp": 72},
     "べホイミ": {"level": 8, "exp": 3}
 }
@@ -158,8 +156,12 @@ if st.session_state.activated_spell and st.session_state.user_data:
         image = Image.open("yu-sya_image2.png")
         st.image(image, width=200)
     with col2:
-        st.markdown(f"### レベル：{data['level']}")
-        st.markdown(f"レベルアップまであと **{data['exp']} EXP**")
+        total_exp =exp_sum(spell)
+        now_lv= total_exp//100
+        last_exp=100-(total_exp%100)
+
+        st.markdown(f"### レベル：{now_lv}")
+        st.markdown(f"レベルアップまであと **{last_exp} EXP**")
         st.markdown("🗺️ 新しい冒険に出発しよう！")
 
     st.markdown("---")
@@ -261,7 +263,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             now_lv= total_exp//100
             last_exp=100-(total_exp%100)
             
-            st.markdown(f"🧪 経験値 +{get_exp} EXP（次のレベルまで {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
+            st.markdown(f"🧪 経験値 +{get_exp} EXP（次のレベルまで {last_exp-get_exp } EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
             if level_up:
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
