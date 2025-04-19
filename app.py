@@ -16,7 +16,7 @@ supabase: Client = create_client(url, key)
 response = supabase.table("records").select("*").eq("place", "good").execute()
 print(response)
 
-# 音楽ファイルを base64 に変換
+# 音楽ファイルを base64 に変換する
 def get_audio_base64(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
