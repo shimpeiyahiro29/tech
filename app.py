@@ -16,6 +16,10 @@ from openai import OpenAI
 # Streamlit secrets から直接 API キーを渡して初期化
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+# scraper.py から関数をインポート
+from scraper import search_places
+
+
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
 def add_records(place,exp,spell):
@@ -330,19 +334,19 @@ if st.session_state.mode is None:
             st.session_state.user_data = None
             st.error("その　じゅもんは　まちがっております")
 
-    
+
 # --- 冒険フロー（readyモード） ---
 if st.session_state.mode == "ready" and st.session_state.activated_spell:
-
     # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
     if st.session_state.show_awakening_message:
         st.success(st.session_state.awakening_message)
         st.session_state.show_awakening_message = False
-    
+    # 🛡️ ここで勇者の画像＋ステータスを表示
+    show_hero_status(st.session_state.activated_spell)
 
+# ★ここから先は show_awakening_message の内側ではなく、
+#  mode=="ready" のトップレベルで常に実行されるUIにする
     if not st.session_state.place_chosen:
-        show_hero_status(st.session_state.activated_spell)  # 勇者ステータス
-        st.markdown("---")
         st.markdown("### 🕒 冒険の時間")
         time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
 
@@ -355,19 +359,39 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
         if st.button("🚀 冒険に出る"):
             with st.spinner("冒険先を探索中..."):
                 time.sleep(1.5)
+
+            # セッションに保存
             st.session_state.selected_time = time_choice
             st.session_state.selected_mood = mood_choice
             st.session_state.selected_location = location_choice
             st.session_state.place_chosen = True
+
+            # search_places を呼び出し
+            minutes = int(time_choice.replace("分", ""))
+
+            if minutes == 30:
+                min_r, max_r = 0, 500
+            elif minutes == 60:
+                min_r, max_r = 500, 1000
+            else:
+                min_r, max_r = 1000, 2000
+
+            spots = search_places(
+                mood=mood_choice,
+                time_min=min_r,
+                time_max=max_r,
+                location_keyword=location_choice
+            )
+            # DataFrame 化してセッションに保持
+            st.session_state.df_places = pd.DataFrame(spots)
+
             st.success("冒険スタート！")
             st.rerun()
-            search_mood = st.session_state.selected_mood # 検索したい場所
-            search_time = 30
 
 
 # --- 候補地表示 ---
-if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,30)) 
+if st.session_state.place_chosen and not st.session_state.checkin_done:
+    df_places = st.session_state.df_places
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
