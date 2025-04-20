@@ -5,6 +5,7 @@ import pandas as pd
 import pydeck as pdk
 import base64
 import streamlit.components.v1 as components
+import requests
 import random
 from supabase import create_client, Client
 url: str = "https://pszefvosagdpzilocerq.supabase.co"
@@ -17,8 +18,7 @@ from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # scraper.py から関数をインポート
-from scraper import search_places
-
+from scraper import search_places, search_places_by_coords
 
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
@@ -354,19 +354,54 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
         mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
 
         st.markdown("### 🏘️ 旅立ちの村")
-        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
+        loc_method = st.radio(
+            "出発地を選んでください",
+            ["現在地を取得 (IP-API)", "手動で入力"],
+            horizontal=True,
+            key="location_method"
+        )
+        use_coords = False
+        location_keyword = None
 
+        if loc_method == "現在地を取得 (IP-API)":
+            # IP-APIを使用して現在の位置を取得
+            try:
+                ipres = requests.get("http://ip-api.com/json/").json()
+                base_lat, base_lon = ipres["lat"], ipres["lon"]
+                st.write(f"取得した現在地: ({base_lat:.4f}, {base_lon:.4f})")
+                use_coords = True
+#                location_keyword = None
+            except Exception as e:
+                st.error(f"現在地の取得に失敗しました: {e}")
+#                use_coords = False
+                location_keyword = st.text_input("出発地を入力してください (例: 博多駅)", key="location_input")
+        else:
+            # 手動入力
+#           use_coords = False
+            location_keyword = st.text_input("出発地を入力してください (例: 博多駅)", key="location_input")
+        
         if st.button("🚀 冒険に出る"):
             with st.spinner("冒険先を探索中..."):
                 time.sleep(1.5)
 
-            # セッションに保存
+#            # セッションに保存
             st.session_state.selected_time = time_choice
             st.session_state.selected_mood = mood_choice
-            st.session_state.selected_location = location_choice
-            st.session_state.place_chosen = True
+
+            # 出発地情報を格納
+            if use_coords:
+                # 現在地取得の場合は緯度・経度を文字列化して保存する、あるいは任意のラベル
+                st.session_state.selected_location = f"現在地 ({base_lat:.4f}, {base_lon:.4f})"
+            else:
+                # 手動入力の場合はそのまま保存
+                st.session_state.selected_location = location_keyword
+#            st.session_state.place_chosen = True
+
+
+
 
             # search_places を呼び出し
+            # 距離レンジの計算
             minutes = int(time_choice.replace("分", ""))
 
             if minutes == 30:
@@ -376,14 +411,32 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
             else:
                 min_r, max_r = 1000, 2000
 
-            spots = search_places(
-                mood=mood_choice,
-                time_min=min_r,
-                time_max=max_r,
-                location_keyword=location_choice
-            )
+            # 検索実行：IP‐APIで取った緯度経度なら search_places_by_coords を
+            # それ以外はキーワード検索用の search_places を呼ぶ
+            if use_coords:
+                spots = search_places_by_coords(
+                    mood=mood_choice,
+                    time_min=min_r,
+                    time_max=max_r,
+                    base_lat=base_lat,
+                    base_lon=base_lon
+                )
+            else:
+                # 手動入力モードならキーワード必須
+                if not location_keyword:
+                    st.error("出発地を入力してください")
+                    st.stop()
+                spots = search_places(
+                    mood=mood_choice,
+                    time_min=min_r,
+                    time_max=max_r,
+                    location_keyword=location_keyword
+                )
+
+
             # DataFrame 化してセッションに保持
             st.session_state.df_places = pd.DataFrame(spots)
+            st.session_state.place_chosen = True
 
             st.success("冒険スタート！")
             st.rerun()

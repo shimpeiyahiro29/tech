@@ -73,6 +73,30 @@ def search_places(mood: str, time_min: int, time_max: int, location_keyword: str
             break
     return results
 
+def search_places_by_coords(mood, time_min, time_max, base_lat, base_lon):
+    # 近傍検索だけ行うバージョン
+    resp = gmaps.places_nearby(
+        location=(base_lat, base_lon),
+        radius=time_max,
+        keyword=mood,
+        language="ja"
+    )
+    results = []
+    for p in resp.get("results", []):
+        loc = p["geometry"]["location"]
+        dist = haversine(base_lat, base_lon, loc["lat"], loc["lng"])
+        if time_min <= dist <= time_max:
+            results.append({
+                "name": p["name"],
+                "vicinity": p.get("vicinity",""),
+                "lat": loc["lat"],
+                "lon": loc["lng"],
+                "distance_m": int(dist)
+            })
+        if len(results) >= 5:
+            break
+    return results
+
 
 # CLI テスト用
 if __name__ == '__main__':
