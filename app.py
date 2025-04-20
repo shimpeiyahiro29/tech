@@ -231,7 +231,7 @@ def custom_message(message, color="green"):
         )
 
 
-# --- UI表示系 ---
+# --- UI表示系 ----
 set_background("backimage2.png") 
 
 st.title("テック勇者リョヤカアプリ")
