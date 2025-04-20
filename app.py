@@ -27,12 +27,10 @@ def add_records(place,exp,spell):
     response = supabase.table("records").insert(data).execute()
     return response
 
-
 ##shopDBからmoodとtimeのカラムを参照して該当のデータを引っ張ってくる
-def search_shops(mood,time):
-    response = supabase.table("place").select("*").eq("mood", mood).eq("time", time).execute()
+def search_shops(mood,area):
+    response = supabase.table("place").select("*").eq("area", area).eq("mood", mood).execute()
     return response.data 
-
 
 ##経験値の合計値をtotal_expに格納する
 def exp_sum(spell):
@@ -40,7 +38,6 @@ def exp_sum(spell):
     exp_values = [record['exp'] for record in response.data]
     total_exp = sum(exp_values)
     return total_exp
-
 
 ##recordsからチェックインした名前の場所と同じ場所を抽出する
 def search_records(spell,place):
@@ -52,7 +49,6 @@ def get_records(spell):
     response = supabase.table("records").select("*").eq("spell", spell).execute()
     return response.data 
 
-
 ##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
 ##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
 def calc_exp(place):
@@ -63,7 +59,6 @@ def calc_exp(place):
     else:
         exp = 20-5*(number_of_records)
     return exp
-
 
 #--- supabase から呪文データを取得して辞書に格納する関数 ---
 def build_spell_db_from_supabase():
@@ -367,7 +362,7 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,30)) 
+    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,st.session_state.selected_location)) 
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
