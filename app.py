@@ -206,6 +206,25 @@ def custom_message(message, color="green"):
             """,
             unsafe_allow_html=True
         )
+    elif color == "blue":
+        st.markdown(
+            f"""
+            <div style="
+                background-color: #e0f0ff;
+                border: 2px solid #3399ff;
+                border-radius: 8px;
+                padding: 1em;
+                margin-top: 0.5em;
+                margin-bottom: 1em;
+                font-weight: normal;
+                color: #003366;
+                box-shadow: 1px 1px 4px rgba(0, 0, 255, 0.1);
+            ">
+            {message}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 
 # --- UI表示系 ---
@@ -303,42 +322,10 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
                     except Exception as e:
                         # すでに存在している場合のエラー処理
                         if hasattr(e, "args") and "duplicate key value violates unique constraint" in str(e.args[0]):
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    background-color: #ffe5e5;
-                                    border: 2px solid #ff0000;
-                                    border-radius: 6px;
-                                    padding: 1em;
-                                    margin-top: 1em;
-                                    font-weight: bold;
-                                    color: #900;
-                                    box-shadow: 2px 2px 6px rgba(255, 0, 0, 0.2);
-                                ">
-                                じゅもん『{new_spell}』は すでに使われています。<br>別のじゅもんを考えてみてください。
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
+                            custom_message(f"じゅもん『{new_spell}』は すでに使われています。<br>別のじゅもんを考えてみてください。", color="red")
                             st.session_state.reset_spell = True
                         else:
-                            st.markdown(
-                                """
-                                <div style="
-                                    background-color: #ffe5e5;
-                                    border: 2px solid #ff0000;
-                                    border-radius: 6px;
-                                    padding: 1em;
-                                    margin-top: 1em;
-                                    font-weight: bold;
-                                    color: #900;
-                                    box-shadow: 2px 2px 6px rgba(255, 0, 0, 0.2);
-                                ">
-                                じゅもんの登録中に予期せぬエラーが発生しました。<br>もう一度試してみてください。
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
+                            custom_message("じゅもんの登録中に予期せぬエラーが発生しました。<br>もう一度試してみてください。", color="red")
                             st.session_state.reset_spell = True
                         return None
                 
@@ -504,7 +491,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
     for i, row in df_places.iterrows():
         place = row["name"]
         st.markdown(f"**🏞️ {place}**")
-        st.info(get_ai_recommendation(place))
+        custom_message(get_ai_recommendation(place), color="blue")  # コメントくっきり表示に変更（からちゃん）
 
     st.markdown("### ✅ 上から目的地を選んでください")
     selected_place = st.radio("目的地を選択", df_places["name"].tolist(), key="selected_place", label_visibility="collapsed")
