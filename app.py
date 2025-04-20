@@ -27,7 +27,8 @@ def add_records(place,exp,spell):
     response = supabase.table("records").insert(data).execute()
     return response
 
-##shopDBからmoodとtimeのカラムを参照して該当のデータを引っ張ってくる
+##shopDBからmoodとareaのカラムを参照して該当のデータを引っ張ってくる
+##時間含めて条件分岐を作っている
 def search_shops(time,mood,area):
     if time=="120分":
         response = supabase.table("place").select("*").eq("mood", mood).limit(10).execute()
