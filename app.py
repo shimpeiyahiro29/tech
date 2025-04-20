@@ -423,6 +423,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             st.success(f"🎉 {selected_place} にチェックインしました！")
+            
             #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
             get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
             add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
@@ -448,4 +449,4 @@ if st.session_state.checkin_history:
     st.markdown("---")
     st.markdown("### 📚 チェックイン履歴")
     df_history = pd.DataFrame(get_records (st.session_state.activated_spell))
-    st.dataframe(df_history[["created_at","place","url"]])
+    st.dataframe(df_history[["created_at","place"]])
