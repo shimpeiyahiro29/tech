@@ -580,12 +580,13 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
 
             
             if st.session_state.user_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
-                st.markdown(f"📊 現在のレベル：{update_now_lv}")  
-            else:                    
                 st.balloons()  # 🎈 この1行をここに追加！
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
                 st.session_state.level_up = True  # ← レベルアップ検知
                 play_bgm_on_mode_selection("levelup.mp3")
+                 
+            else:                    
+                st.markdown(f"📊 現在のレベル：{update_now_lv}") 
             
             # # 🔊 レベルアップ音を鳴らす（1回だけ）
             # if st.session_state.get("level_up"):
