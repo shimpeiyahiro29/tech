@@ -367,7 +367,7 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,st.session_state.selected_location)) 
+    df_places = pd.DataFrame(search_shops(st.session_state.selected_time,st.session_state.selected_mood,st.session_state.selected_location)) 
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
