@@ -91,7 +91,7 @@ def get_audio_base64(file_path):
 def play_bgm_on_mode_selection(bgm,volum):
     audio_base64 = get_audio_base64(bgm)
     audio_html = f"""
-    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay ></audio>
+    <audio id="bgm" src="data:audio/mp3;base64,0.1" autoplay ></audio>
     <script>
         var audio = document.getElementById('bgm');
         if (audio) {{
@@ -258,7 +258,7 @@ if st.session_state.mode is None:
 
 # モードが選ばれて、bgm_triggered が True のときのみ再生
 if st.session_state.bgm_triggered:
-    play_bgm_on_mode_selection("bgm2.mp4",0.2)
+    play_bgm_on_mode_selection("bgm2.mp4")
     st.session_state.bgm_triggered = False  # 一度だけ再生
 
 # --- 新しい冒険 ---
@@ -588,7 +588,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             
             # 🔊 レベルアップ音を鳴らす（1回だけ）
             if st.session_state.get("level_up"):
-                play_bgm_on_mode_selection("levelup.mp3", 0.2)
+                play_bgm_on_mode_selection("levelup.mp3")
                 st.session_state.level_up = False
 
 # --- 履歴表示 ---
