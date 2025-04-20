@@ -298,13 +298,13 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
 
 
         # ✅ ここでメッセージを保存しておく！
-        st.session_state.awakening_message = f"『{new_spell}』 勇者は　うまれた！"
-        st.session_state.show_awakening_message = True
+#        st.session_state.awakening_message = f"『{new_spell}』 勇者は　うまれた！"
+#        st.session_state.show_awakening_message = True
         
         # 次の表示へ
-        st.session_state.new_spell_ready = False  # 念のためリセット
-        st.session_state.mode = "ready"
-        st.rerun()
+#        st.session_state.new_spell_ready = False  # 念のためリセット
+#        st.session_state.mode = "ready"
+#        st.rerun()
 
     else:
         st.markdown("### あなたの ふっかつのじゅもん を入力してください")
@@ -336,7 +336,7 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
                     st.session_state.activated_spell = new_spell
                     st.session_state.user_data = spell_db[new_spell]
                     st.session_state.new_spell_ready = True
-                    custom_message("『{new_spell}』 勇者は　うまれた！", color="green")
+                    st.session_state.awakening_message = "『{new_spell}』 勇者は　うまれた！" # ✅ 次の画面で表示するために保存
                     st.session_state.mode = "ready"
                     st.rerun()
                     st.stop()
@@ -344,13 +344,13 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
                 custom_message("じゅもんを入力してください", color="red")
         st.stop()
     
-# --- 「うまれた」あとの処理 ---
-if st.session_state.mode == "new" and st.session_state.new_spell_ready:
-    st.session_state.awakening_message = f"『{st.session_state.activated_spell}』 勇者は　うまれた！"
-    st.session_state.show_awakening_message = True
-    st.session_state.new_spell_ready = False
-    st.session_state.mode = "ready"
-    st.rerun()
+# --- 「うまれた」あとの処理 --- 不要
+#if st.session_state.mode == "new" and st.session_state.new_spell_ready:
+#    st.session_state.awakening_message = f"『{st.session_state.activated_spell}』 勇者は　うまれた！"
+#    st.session_state.show_awakening_message = True
+#    st.session_state.new_spell_ready = False
+#    st.session_state.mode = "ready"
+#    st.rerun()
 
 
 
