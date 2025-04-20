@@ -115,7 +115,7 @@ def show_hero_status(spell):
             total_exp =exp_sum(spell)
             now_lv= total_exp//100
             last_exp=100-(total_exp%100)
-            st.session_state.user_lv=now_lv
+            #st.session_state.user_lv=now_lv
             st.markdown(f"### レベル：{now_lv}")
             st.markdown(f"レベルアップまであと **{last_exp} EXP**")
             st.markdown("🗺️ 新しい冒険に出発しよう！")
