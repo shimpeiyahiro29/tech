@@ -564,7 +564,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             custom_message(f"🎉 {selected_place} にチェックインしました！", color="green")
-            st.session_state.user_lv =exp_sum(st.session_state.activated_spell)
+            st.session_state.user_lv =exp_sum(st.session_state.activated_spell)//100
             #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
             get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
             add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
