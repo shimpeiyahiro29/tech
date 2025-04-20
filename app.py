@@ -640,7 +640,15 @@ if st.session_state.place_chosen and not st.session_state.checkin_done:
         },
     }
 
-    # マップ描画
+    
+
+    st.markdown("### 🌟 目的地候補とAIコメント")
+    for i, row in df_places.iterrows():
+        place = row["name"]
+        st.markdown(f"**🏞️ {place}**")
+        custom_message(get_ai_recommendation(place), color="blue")  # コメントくっきり表示に変更（からちゃん）
+
+# マップ描画
     st.pydeck_chart(
         pdk.Deck(
             map_style='mapbox://styles/mapbox/streets-v12',
@@ -649,13 +657,6 @@ if st.session_state.place_chosen and not st.session_state.checkin_done:
             tooltip=tooltip,
         )
     )
-
-    st.markdown("### 🌟 目的地候補とAIコメント")
-    for i, row in df_places.iterrows():
-        place = row["name"]
-        st.markdown(f"**🏞️ {place}**")
-        custom_message(get_ai_recommendation(place), color="blue")  # コメントくっきり表示に変更（からちゃん）
-
     st.markdown("### ✅ 上から目的地を選んでください")
     selected_place = st.radio("目的地を選択", df_places["name"].tolist(), key="selected_place", label_visibility="collapsed")
 
