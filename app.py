@@ -5,6 +5,7 @@ import pandas as pd
 import pydeck as pdk
 import base64
 import streamlit.components.v1 as components
+import requests
 import random
 
 from supabase import create_client, Client
@@ -16,6 +17,9 @@ from openai import OpenAI
 
 # Streamlit secrets から直接 API キーを渡して初期化
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# scraper.py から関数をインポート
+from scraper import search_places, search_places_by_coords, gmaps
 
 ##############################バックエンド側関数##############################
 ##add_records("place","exp")を入れると、recordsに挿入される。→チェックインをする時に場所の情報とexpを載せたい
@@ -452,7 +456,6 @@ if st.session_state.mode is None:
 
 # --- 冒険フロー（readyモード） ---
 if st.session_state.mode == "ready" and st.session_state.activated_spell:
-
     # 🟢 表示したいメッセージ（うまれた／めをさました）をここで表示
     if st.session_state.show_awakening_message:
         custom_message(st.session_state.awakening_message, color="green")
@@ -461,6 +464,8 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
 
     show_hero_status(st.session_state.activated_spell)  # 勇者ステータス
 
+# ★ここから先は show_awakening_message の内側ではなく、
+#  mode=="ready" のトップレベルで常に実行されるUIにする
     if not st.session_state.place_chosen:
         st.markdown("---")
         st.markdown("### ⏳ 冒険の時間")
@@ -470,22 +475,174 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
         mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
 
         st.markdown("### 🏘️ 旅立ちの村")
-        location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
+        loc_method = st.radio(
+            "出発地を選んでください",
+            ["現在地を取得 (IP-API)", "手動で入力"],
+            horizontal=True,
+            key="location_method"
+        )
+        use_coords = False
+        location_keyword = None
+
+        if loc_method == "現在地を取得 (IP-API)":
+            # IP-APIを使用して現在の位置を取得
+            try:
+                ipres = requests.get("http://ip-api.com/json/").json()
+                base_lat, base_lon = ipres["lat"], ipres["lon"]
+                st.write(f"取得した現在地: ({base_lat:.4f}, {base_lon:.4f})")
+                use_coords = True
+#                location_keyword = None
+            except Exception as e:
+                st.error(f"現在地の取得に失敗しました: {e}")
+#                use_coords = False
+                location_keyword = st.text_input("出発地を入力してください (例: 博多駅)", key="location_input")
+        else:
+            # 手動入力
+#           use_coords = False
+            location_keyword = st.text_input("出発地を入力してください (例: 博多駅)", key="location_input")
+        
 
         if st.button("🧭 冒険に出る"):
             with st.spinner("冒険先を探索中..."):
                 time.sleep(1.5)
+
+
+            if use_coords:
+                st.session_state.base_lat = base_lat #現在地の緯度・経度をセッションに保存
+                st.session_state.base_lon = base_lon #現在地の緯度・経度をセッションに保存
+                st.session_state.selected_location = f"現在地 ({base_lat:.4f}, {base_lon:.4f})" #これいるかな？
+            else:
+                # 手動入力モード: 入力キーワードをジオコーディング
+                if not location_keyword:
+                    st.error("出発地を入力してください")
+                    st.stop()
+                # ジオコーディングを実行
+                geocode_result = gmaps.geocode(location_keyword, language="ja")
+                if not geocode_result:
+                    st.error("ジオコーディングに失敗しました")
+                    st.stop()
+                loc = geocode_result[0]["geometry"]["location"]
+                st.session_state.base_lat = loc["lat"]
+                st.session_state.base_lon = loc["lng"]
+                st.session_state.selected_location = location_keyword
+
+#            # セッションに保存
             st.session_state.selected_time = time_choice
             st.session_state.selected_mood = mood_choice
-            st.session_state.selected_location = location_choice
+            st.session_state.selected_location = (
+                f"現在地 ({base_lat:.4f}, {base_lon:.4f})"
+                if use_coords else location_keyword
+            )
+
+            # 出発地情報を格納
+            if use_coords:
+                # 現在地取得の場合は緯度・経度を文字列化して保存する、あるいは任意のラベル
+                st.session_state.selected_location = f"現在地 ({base_lat:.4f}, {base_lon:.4f})"
+            else:
+                # 手動入力の場合はそのまま保存
+                st.session_state.selected_location = location_keyword
+#            st.session_state.place_chosen = True
+
+
+
+
+            # search_places を呼び出し
+            # 距離レンジの計算
+            minutes = int(time_choice.replace("分", ""))
+
+            if minutes == 30:
+                min_r, max_r = 0, 500
+            elif minutes == 60:
+                min_r, max_r = 500, 1000
+            else:
+                min_r, max_r = 1000, 2000
+
+            # 検索実行：IP‐APIで取った緯度経度なら search_places_by_coords を
+            # それ以外はキーワード検索用の search_places を呼ぶ
+            if use_coords:
+                spots = search_places_by_coords(
+                    mood=mood_choice,
+                    time_min=min_r,
+                    time_max=max_r,
+                    base_lat=base_lat,
+                    base_lon=base_lon
+                )
+            else:
+                # 手動入力モードならキーワード必須
+                if not location_keyword:
+                    st.error("出発地を入力してください")
+                    st.stop()
+                spots = search_places(
+                    mood=mood_choice,
+                    time_min=min_r,
+                    time_max=max_r,
+                    location_keyword=location_keyword
+                )
+
+
+            # DataFrame 化してセッションに保持
+            st.session_state.df_places = pd.DataFrame(spots)
             st.session_state.place_chosen = True
             custom_message("冒険スタート！", color="green")
             st.rerun()
 
 
 # --- 候補地表示 ---
-if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = pd.DataFrame(search_shops(st.session_state.selected_time,st.session_state.selected_mood,st.session_state.selected_location)) 
+if st.session_state.place_chosen and not st.session_state.checkin_done:
+    df_places = st.session_state.df_places
+    # AI コメントを列に追加
+    df_places["recommendation"] = df_places["name"].apply(get_ai_recommendation)
+
+    #セッションに保存されている現在地の緯度・経度を取得
+    base_lat = st.session_state.base_lat
+    base_lon = st.session_state.base_lon
+
+    # 初期ビュー
+    initial_view_state = pdk.ViewState(
+        latitude=base_lat,
+        longitude=base_lon,
+        zoom=14,
+        pitch=30
+    )
+
+    # 現在地レイヤー (青ピン)
+    user_layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=[{"lat": base_lat, "lon": base_lon}],
+        get_position='[lon, lat]',
+        get_color='[0, 0, 255, 200]',
+        get_radius=100,
+        pickable=False,
+    )
+
+    # 目的地候補レイヤー (赤ピン)
+    place_layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=df_places,
+        get_position='[lon, lat]',
+        get_color='[200, 30, 0, 160]',
+        get_radius=100,
+        pickable=True,
+    )
+
+    # 吹き出し設定
+    tooltip = {
+        "html": "<b>{name}</b><br>{recommendation}",
+        "style": {
+            "backgroundColor": "white",
+            "color": "black",
+        },
+    }
+
+    # マップ描画
+    st.pydeck_chart(
+        pdk.Deck(
+            map_style='mapbox://styles/mapbox/streets-v12',
+            initial_view_state=initial_view_state,
+            layers=[user_layer, place_layer],
+            tooltip=tooltip,
+        )
+    )
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
@@ -496,69 +653,71 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
     st.markdown("### ✅ 上から目的地を選んでください")
     selected_place = st.radio("目的地を選択", df_places["name"].tolist(), key="selected_place", label_visibility="collapsed")
 
-    if selected_place:
-        st.session_state.place_chosen = True
-        
+#マップブロックを丸ごと削除
+#    if selected_place:
+#        st.session_state.place_chosen = True
+#        
+#
+#        selected_df = df_places[df_places["name"] == selected_place]
+#        st.pydeck_chart(pdk.Deck(
+#            map_style='mapbox://styles/mapbox/streets-v12',
+#            initial_view_state=pdk.ViewState(
+#                latitude=float(selected_df["lat"].values[0]),
+#                longitude=float(selected_df["lon"].values[0]),
+#                zoom=14,
+#                pitch=30,
+#           ),
 
-        selected_df = df_places[df_places["name"] == selected_place]
-        st.pydeck_chart(pdk.Deck(
-            map_style='mapbox://styles/mapbox/streets-v12',
-            initial_view_state=pdk.ViewState(
-                latitude=float(selected_df["lat"].values[0]),
-                longitude=float(selected_df["lon"].values[0]),
-                zoom=14,
-                pitch=30,
-            ),
-            layers=[
-                pdk.Layer(
-                    'ScatterplotLayer',
-                    data=selected_df,
-                    get_position='[lon, lat]',
-                    get_color='[200, 30, 0, 160]',
-                    get_radius=100,
-                ),
-            ]
-        ))
+#            
+#            layers=[
+#                pdk.Layer(
+#                    'ScatterplotLayer',
+#                    data=selected_df,
+#                    get_position='[lon, lat]',
+#                    get_color='[200, 30, 0, 160]',
+#                    get_radius=100,
+#                ),
+#           ]
+#        ))
 
-        st.markdown("冒険を終えたら、チェックインしてください！")
+    st.markdown("冒険を終えたら、チェックインしてください！")
 
-        if st.button("✅ チェックイン"):
-            gained_exp = 20
-            current_exp = st.session_state.user_data["exp"]
-            current_level = st.session_state.user_data["level"]
-            new_exp = current_exp + gained_exp
-            new_level = current_level
-            level_up = False
-            while new_exp >= 100:
-                new_exp -= 100
-                new_level += 1
-                level_up = True
+    if st.button("✅ チェックイン"):
+        gained_exp = 20
+        current_exp = st.session_state.user_data["exp"]
+        current_level = st.session_state.user_data["level"]
+        new_exp = current_exp + gained_exp
+        new_level = current_level
+        level_up = False
+        while new_exp >= 100:
+            new_exp -= 100
+            new_level += 1
+            level_up = True
 
-            # 経験値とレベルを更新　
-            st.session_state.user_data["exp"] = new_exp
-            st.session_state.user_data["level"] = new_level
-            st.session_state.checkin_done = True
+        # 経験値とレベルを更新　
+        st.session_state.user_data["exp"] = new_exp
+        st.session_state.user_data["level"] = new_level
+        st.session_state.checkin_done = True
 
-            # チェックイン履歴保存
-            st.session_state.checkin_history.append({
-                "place": selected_place,
-                "time": st.session_state.selected_time,
-                "mood": st.session_state.selected_mood,
-                "location": st.session_state.selected_location,
-                "exp_gained": gained_exp
-            })
+        # チェックイン履歴保存
+        st.session_state.checkin_history.append({
+            "place": selected_place,
+            "time": st.session_state.selected_time,
+            "mood": st.session_state.selected_mood,
+            "location": st.session_state.selected_location,
+            "exp_gained": gained_exp
+        })
 
-            st.balloons()  # 🎈 風船を上げる
-
-            custom_message(f"🎉 {selected_place} にチェックインしました！", color="green")
-            st.session_state.user_lv =exp_sum(st.session_state.activated_spell)//100
-            #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
-            get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
-            add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
-            update_now_lv= exp_sum(st.session_state.activated_spell)//100#チェックインした後の更新したレベルを計算
-            last_exp=(exp_sum(st.session_state.activated_spell)%100)#チェックインした後の更新した経験値を計算
+        st.balloons()  # 🎈 風船を上げる
+        custom_message(f"🎉 {selected_place} にチェックインしました！", color="green")
+        st.session_state.user_lv =exp_sum(st.session_state.activated_spell)//100
+        #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
+        get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
+        add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
+        update_now_lv= exp_sum(st.session_state.activated_spell)//100#チェックインした後の更新したレベルを計算
+        last_exp=(exp_sum(st.session_state.activated_spell)%100)#チェックインした後の更新した経験値を計算
             
-            st.markdown(f"🧪 経験値 +{get_exp} EXP（現在の経験値 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
+        st.markdown(f"🧪 経験値 +{get_exp} EXP（現在の経験値 {last_exp} EXP）")####DBを参照して、チェックイン後のレベルを表示する
 
             # if level_up:
             #     st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{new_level}**")
@@ -566,13 +725,13 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             #     st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
             
-            if st.session_state.user_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
-                st.markdown(f"📊 現在のレベル：{update_now_lv}")  
-            else:                    
-                st.balloons()  # 🎈 この1行をここに追加！
-                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{st.session_state.user_lv}**→**{update_now_lv}**")
-                st.session_state.level_up = True  # ← レベルアップ検知
-                play_bgm_on_mode_selection("levelup.mp3")
+        if st.session_state.user_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
+            st.markdown(f"📊 現在のレベル：{update_now_lv}")  
+        else:                    
+            st.balloons()  # 🎈 この1行をここに追加！
+            st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{st.session_state.user_lv}**→**{update_now_lv}**")
+            st.session_state.level_up = True  # ← レベルアップ検知
+            play_bgm_on_mode_selection("levelup.mp3")
             
             # # 🔊 レベルアップ音を鳴らす（1回だけ）
             # if st.session_state.get("level_up"):
