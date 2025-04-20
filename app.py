@@ -100,22 +100,6 @@ def play_bgm_on_mode_selection():
     components.html(audio_html, height=0)
 
 
-# --- 勇者の画像＋ステータス表示（共通） ---
-def show_hero_status(spell):
-    if st.session_state.activated_spell and st.session_state.user_data:
-        data = st.session_state.user_data
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            image = Image.open("yu-sya_image2.png")
-            st.image(image, width=200)
-        with col2:
-            total_exp =exp_sum(spell)
-            now_lv= total_exp//100
-            last_exp=100-(total_exp%100)
-            st.markdown(f"### レベル：{now_lv}")
-            st.markdown(f"レベルアップまであと **{last_exp} EXP**")
-            st.markdown("🗺️ 新しい冒険に出発しよう！")
-
 # --- データベース（ふっかつのじゅもん） ---
 spell_db = build_spell_db_from_supabase()
 
@@ -136,13 +120,30 @@ def init_session_state():
         "place_chosen": False,
         "checkin_done": False,
         "checkin_history": [],
-        "new_spell_ready": False
+        "new_spell_ready": False,
+        "user_lv":None,
     }
     for key, default in keys_and_defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default
 
 init_session_state()
+# --- 勇者の画像＋ステータス表示（共通） ---
+def show_hero_status(spell):
+    if st.session_state.activated_spell and st.session_state.user_data:
+        data = st.session_state.user_data
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            image = Image.open("yu-sya_image2.png")
+            st.image(image, width=200)
+        with col2:
+            total_exp =exp_sum(spell)
+            now_lv= total_exp//100
+            last_exp=100-(total_exp%100)
+            st.session_state.user_lv=now_lv
+            st.markdown(f"### レベル：{now_lv}")
+            st.markdown(f"レベルアップまであと **{last_exp} EXP**")
+            st.markdown("🗺️ 新しい冒険に出発しよう！")
 
 # --- UI表示系 ---
 st.title("テック勇者リョヤカアプリ")
@@ -152,17 +153,6 @@ if st.session_state.show_awakening_message:
     st.success(st.session_state.awakening_message)
     st.session_state.show_awakening_message = False
 
-############################################################削除して良さそう############################################################
-# --- 仮の候補地DB（緯度・経度含む） ---
-# def get_candidate_places_from_db():
-#     return pd.DataFrame([
-#         {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
-#         {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
-#         {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
-#         {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
-#         {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
-#     ])
-########################################################################################################################
 # --- AIコメント生成関数 ---
 @st.cache_data(show_spinner=False)
 def get_ai_recommendation(place: str) -> str:
@@ -446,11 +436,9 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             # else:
             #     st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
-            total_exp =exp_sum(st.session_state.activated_spell)
-            now_lv= total_exp//100
-            if now_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
-                st.markdown(f"📊 現在のレベル：{update_now_lv}")
-                
+            
+            if st.session_state.user_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
+                st.markdown(f"📊 現在のレベル：{update_now_lv}")  
             else:                    
                 st.balloons()  # 🎈 この1行をここに追加！
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
@@ -460,4 +448,4 @@ if st.session_state.checkin_history:
     st.markdown("---")
     st.markdown("### 📚 チェックイン履歴")
     df_history = pd.DataFrame(get_records (st.session_state.activated_spell))
-    st.dataframe(df_history[["created_at","place"]])
+    st.dataframe(df_history[["created_at","place","url"]])
