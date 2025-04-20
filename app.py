@@ -91,7 +91,7 @@ def get_audio_base64(file_path):
 def play_bgm_on_mode_selection(bgm,volum):
     audio_base64 = get_audio_base64(bgm)
     audio_html = f"""
-    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay loop></audio>
+    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay ></audio>
     <script>
         var audio = document.getElementById('bgm');
         if (audio) {{
