@@ -585,11 +585,12 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
                 st.balloons()  # 🎈 この1行をここに追加！
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
                 st.session_state.level_up = True  # ← レベルアップ検知
-            
-            # 🔊 レベルアップ音を鳴らす（1回だけ）
-            if st.session_state.get("level_up"):
                 play_bgm_on_mode_selection("levelup.mp3")
-                st.session_state.level_up = False
+            
+            # # 🔊 レベルアップ音を鳴らす（1回だけ）
+            # if st.session_state.get("level_up"):
+                
+            #     st.session_state.level_up = False
 
 # --- 履歴表示 ---
 if st.session_state.checkin_history:
