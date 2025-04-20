@@ -88,14 +88,14 @@ def get_audio_base64(file_path):
     return base64.b64encode(data).decode()
 
 # BGM をモード選択時に再生する関数
-def play_bgm_on_mode_selection(bgm,volum):
+def play_bgm_on_mode_selection(bgm):
     audio_base64 = get_audio_base64(bgm)
     audio_html = f"""
-    <audio id="bgm" src="data:audio/mp3;base64,0.1" autoplay ></audio>
+    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay ></audio>
     <script>
         var audio = document.getElementById('bgm');
         if (audio) {{
-            audio.volume = {volum};
+            audio.volume = 0.1;
             audio.play();
         }}
     </script>
