@@ -115,7 +115,7 @@ def show_hero_status(spell):
             total_exp =exp_sum(spell)
             now_lv= total_exp//100
             last_exp=100-(total_exp%100)
-            st.session_state.user_lv=now_lv
+            #st.session_state.user_lv=now_lv
             st.markdown(f"### レベル：{now_lv}")
             st.markdown(f"レベルアップまであと **{last_exp} EXP**")
             st.markdown("🗺️ 新しい冒険に出発しよう！")
@@ -564,7 +564,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             custom_message(f"🎉 {selected_place} にチェックインしました！", color="green")
-            st.session_state.user_lv =exp_sum(st.session_state.activated_spell)
+            st.session_state.user_lv =exp_sum(st.session_state.activated_spell)//100
             #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
             get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
             add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
@@ -583,13 +583,14 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
                 st.markdown(f"📊 現在のレベル：{update_now_lv}")  
             else:                    
                 st.balloons()  # 🎈 この1行をここに追加！
-                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
+                st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{st.session_state.user_lv}**→**{update_now_lv}**")
                 st.session_state.level_up = True  # ← レベルアップ検知
-            
-            # 🔊 レベルアップ音を鳴らす（1回だけ）
-            if st.session_state.get("level_up"):
                 play_bgm_on_mode_selection("levelup.mp3")
-                st.session_state.level_up = False
+            
+            # # 🔊 レベルアップ音を鳴らす（1回だけ）
+            # if st.session_state.get("level_up"):
+                
+            #     st.session_state.level_up = False
 
 # --- 履歴表示 ---
 if st.session_state.checkin_history:
