@@ -34,7 +34,7 @@ def search_shops(time,mood,area):
     if time=="120分":
         response = supabase.table("place").select("*").eq("mood", mood).limit(10).execute()
     elif time=="60分" and (area=="天神駅" or area=="中洲川端駅"):
-        response = supabase.table("place").select("*").eq("area", ["天神駅","中洲川端駅"]).eq("mood", mood).limit(5).execute()
+        response = supabase.table("place").select("*").eq("area", ["天神駅"]).eq("mood", mood).limit(5).execute()
     else:
         response = supabase.table("place").select("*").eq("area", area).eq("mood", mood).limit(5).execute()
     return response.data 
