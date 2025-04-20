@@ -28,12 +28,16 @@ def add_records(place,exp,spell):
     response = supabase.table("records").insert(data).execute()
     return response
 
-
-##shopDBからmoodとtimeのカラムを参照して該当のデータを引っ張ってくる
-def search_shops(mood,time):
-    response = supabase.table("place").select("*").eq("mood", mood).eq("time", time).execute()
+##shopDBからmoodとareaのカラムを参照して該当のデータを引っ張ってくる
+##時間含めて条件分岐を作っている
+def search_shops(time,mood,area):
+    if time=="120分":
+        response = supabase.table("place").select("*").eq("mood", mood).limit(10).execute()
+    elif time=="60分" and (area=="天神駅" or area=="中洲川端駅"):
+        response = supabase.table("place").select("*").in_("area", ["天神駅", "中洲川端駅"]).eq("mood", mood).limit(5).execute()
+    else:
+        response = supabase.table("place").select("*").eq("area", area).eq("mood", mood).limit(5).execute()
     return response.data 
-
 
 ##経験値の合計値をtotal_expに格納する
 def exp_sum(spell):
@@ -41,7 +45,6 @@ def exp_sum(spell):
     exp_values = [record['exp'] for record in response.data]
     total_exp = sum(exp_values)
     return total_exp
-
 
 ##recordsからチェックインした名前の場所と同じ場所を抽出する
 def search_records(spell,place):
@@ -53,7 +56,6 @@ def get_records(spell):
     response = supabase.table("records").select("*").eq("spell", spell).execute()
     return response.data 
 
-
 ##recordsからチェックインした名前の場所と同じ場所がないかを調べ、経験値を計算する。
 ##経験値のロジックは、初めて行ったところは20で一回いくごとに-5される。最低が５。想定しうる経験値は20,25,10,5
 def calc_exp(place):
@@ -64,7 +66,6 @@ def calc_exp(place):
     else:
         exp = 20-5*(number_of_records)
     return exp
-
 
 #--- supabase から呪文データを取得して辞書に格納する関数 ---
 def build_spell_db_from_supabase():
@@ -87,14 +88,14 @@ def get_audio_base64(file_path):
     return base64.b64encode(data).decode()
 
 # BGM をモード選択時に再生する関数
-def play_bgm_on_mode_selection():
-    audio_base64 = get_audio_base64("bgm2.mp4")
+def play_bgm_on_mode_selection(bgm):
+    audio_base64 = get_audio_base64(bgm)
     audio_html = f"""
-    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay loop></audio>
+    <audio id="bgm" src="data:audio/mp3;base64,{audio_base64}" autoplay ></audio>
     <script>
         var audio = document.getElementById('bgm');
         if (audio) {{
-            audio.volume = 0.2;
+            audio.volume = 0.1;
             audio.play();
         }}
     </script>
@@ -114,9 +115,10 @@ def show_hero_status(spell):
             total_exp =exp_sum(spell)
             now_lv= total_exp//100
             last_exp=100-(total_exp%100)
+            st.session_state.user_lv=now_lv
             st.markdown(f"### レベル：{now_lv}")
             st.markdown(f"レベルアップまであと **{last_exp} EXP**")
-            st.markdown("🌄 新しい冒険に出発しよう！")
+            st.markdown("🗺️ 新しい冒険に出発しよう！")
 
 # --- データベース（ふっかつのじゅもん） ---
 spell_db = build_spell_db_from_supabase()
@@ -139,13 +141,15 @@ def init_session_state():
         "place_chosen": False,
         "checkin_done": False,
         "checkin_history": [],
-        "new_spell_ready": False
+        "new_spell_ready": False,
+        "user_lv":None,
     }
     for key, default in keys_and_defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default
 
 init_session_state()
+
 
 # 背景画像を設定する関数
 def set_background(image_file):
@@ -214,17 +218,6 @@ if st.session_state.show_awakening_message:
     st.success(st.session_state.awakening_message)
     st.session_state.show_awakening_message = False
 
-############################################################削除して良さそう############################################################
-# --- 仮の候補地DB（緯度・経度含む） ---
-# def get_candidate_places_from_db():
-#     return pd.DataFrame([
-#         {"name": names, "lat": lat, "lon": lon},#データベースからかmood：カフェ、時間；30で直接指定したDBの結果が表示される。
-#         {"name": "キャナルシティ", "lat": 33.5896, "lon": 130.4119},
-#         {"name": "天神地下街", "lat": 33.5903, "lon": 130.4017},
-#         {"name": "中洲のスパ", "lat": 33.5931, "lon": 130.4094},
-#         {"name": "リバーウォーク", "lat": 33.8859, "lon": 130.8753},
-#     ])
-########################################################################################################################
 # --- AIコメント生成関数 ---
 @st.cache_data(show_spinner=False)
 def get_ai_recommendation(place: str) -> str:
@@ -265,7 +258,7 @@ if st.session_state.mode is None:
 
 # モードが選ばれて、bgm_triggered が True のときのみ再生
 if st.session_state.bgm_triggered:
-    play_bgm_on_mode_selection()
+    play_bgm_on_mode_selection("bgm2.mp4")
     st.session_state.bgm_triggered = False  # 一度だけ再生
 
 # --- 新しい冒険 ---
@@ -483,16 +476,16 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
 
     if not st.session_state.place_chosen:
         st.markdown("---")
-        st.markdown("### 🕒 冒険の時間")
+        st.markdown("### ⏳ 冒険の時間")
         time_choice = st.radio("時間を選んでください", ["30分", "60分", "120分"], horizontal=True, key="time_choice")
 
-        st.markdown("### 🎭 冒険の気分")
+        st.markdown("### 💫 冒険の気分")
         mood_choice = st.radio("気分を選んでください", ["カフェ", "リラクゼーション", "エンタメ", "ショッピング"], horizontal=True, key="mood_choice")
 
         st.markdown("### 🏘️ 旅立ちの村")
         location_choice = st.radio("出発地を選んでください", ["博多駅", "天神駅", "中洲川端駅"], horizontal=True, key="location_choice")
 
-        if st.button("🚀 冒険に出る"):
+        if st.button("🧭 冒険に出る"):
             with st.spinner("冒険先を探索中..."):
                 time.sleep(1.5)
             st.session_state.selected_time = time_choice
@@ -505,7 +498,7 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
 
 # --- 候補地表示 ---
 if st.session_state.selected_time and not st.session_state.checkin_done:
-    df_places = pd.DataFrame(search_shops(st.session_state.selected_mood,30)) 
+    df_places = pd.DataFrame(search_shops(st.session_state.selected_time,st.session_state.selected_mood,st.session_state.selected_location)) 
 
     st.markdown("### 🌟 目的地候補とAIコメント")
     for i, row in df_places.iterrows():
@@ -571,6 +564,7 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             st.balloons()  # 🎈 風船を上げる
 
             custom_message(f"🎉 {selected_place} にチェックインしました！", color="green")
+            st.session_state.user_lv =exp_sum(st.session_state.activated_spell)
             #経験値が100溜まるとレベルが貯まる。100-余りで残りの経験値を算出する。
             get_exp=calc_exp(selected_place)#チェックインした店の名前から獲得経験値を計算
             add_records(selected_place,get_exp,st.session_state.activated_spell)#recordsにチェックインで選んだ店名,経験値,ふっかつの呪文を入れる
@@ -584,11 +578,9 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             # else:
             #     st.markdown(f"📊 現在のレベル：{now_lv}")####DBを参照して、チェックイン後のレベルを表示する
 
-            total_exp =exp_sum(st.session_state.activated_spell)
-            now_lv= total_exp//100
-            if now_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
-                st.markdown(f"📊 現在のレベル：{update_now_lv}")
-                
+            
+            if st.session_state.user_lv == update_now_lv: # ふっかつのじゅもんを唱えた時と、チェックインをした後のレベルが違ったらレベルアップ
+                st.markdown(f"📊 現在のレベル：{update_now_lv}")  
             else:                    
                 st.balloons()  # 🎈 この1行をここに追加！
                 st.markdown(f"🌟 レベルアップ！ 新しいレベル：**{update_now_lv}**")
@@ -596,8 +588,8 @@ if st.session_state.selected_time and not st.session_state.checkin_done:
             
             # 🔊 レベルアップ音を鳴らす（1回だけ）
             if st.session_state.get("level_up"):
-                play_bgm("levelup.mp3", loop=False, volume=0.2)
-                st.session_state.level_up = Falsef
+                play_bgm_on_mode_selection("levelup.mp3")
+                st.session_state.level_up = False
 
 # --- 履歴表示 ---
 if st.session_state.checkin_history:
