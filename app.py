@@ -178,14 +178,17 @@ def custom_message(message, color="green"):
         st.markdown(
             f"""
             <div style="
-                background-color: #d1f5d3;
-                border: 2px solid #37a148;
-                border-radius: 8px;
-                padding: 1em;
-                margin-top: 1em;
+                background-color: #c8facc;
+                border: 2px solid #2e8b57;
+                border-radius: 10px;
+                padding: 1em 1.2em;
+                margin: 1em 0;
                 font-weight: bold;
-                color: #1f6626;
-                box-shadow: 2px 2px 6px rgba(0, 128, 0, 0.2);
+                font-size: 18px;
+                color: #155724;
+                box-shadow: 3px 3px 10px rgba(0, 100, 0, 0.2);
+                line-height: 1.6;
+                text-align: center;
             ">
             {message}
             </div>
@@ -235,7 +238,7 @@ def custom_message(message, color="green"):
 set_background("backimage2.png") 
 
 st.title("テック勇者リョヤカアプリ")
-st.caption("気分と時間に合わせて冒険の旅を提案します。まちを旅して勇者を育てよう！")
+st.markdown("気分と時間に合わせて冒険の旅を提案します。まちを旅して勇者を育てよう！")
 
 if st.session_state.show_awakening_message:
     st.success(st.session_state.awakening_message)
@@ -306,7 +309,7 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
         st.session_state.show_awakening_message = True
         
         # 次の表示へ
-        st.session_state.new_spell_ready = False  # 念のためリセット
+#        st.session_state.new_spell_ready = False  # 念のためリセット
         st.session_state.mode = "ready"
         st.rerun()
 
@@ -339,8 +342,8 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
                     spell_db[new_spell] = {"level": 1, "exp": 0}
                     st.session_state.activated_spell = new_spell
                     st.session_state.user_data = spell_db[new_spell]
-                    st.session_state.new_spell_ready = True
-                    custom_message("『{new_spell}』 勇者は　うまれた！", color="green")
+                    st.session_state.awakening_message = f"『{new_spell}』 勇者は　うまれた！" # ✅ 次の画面で表示するために保存
+                    st.session_state.show_awakening_message = True
                     st.session_state.mode = "ready"
                     st.rerun()
                     st.stop()
@@ -348,13 +351,13 @@ if st.session_state.mode == "new" and not st.session_state.new_spell_ready:
                 custom_message("じゅもんを入力してください", color="red")
         st.stop()
     
-# --- 「うまれた」あとの処理 ---
-if st.session_state.mode == "new" and st.session_state.new_spell_ready:
-    st.session_state.awakening_message = f"『{st.session_state.activated_spell}』 勇者は　うまれた！"
-    st.session_state.show_awakening_message = True
-    st.session_state.new_spell_ready = False
-    st.session_state.mode = "ready"
-    st.rerun()
+# --- 「うまれた」あとの処理 --- 不要
+#if st.session_state.mode == "new" and st.session_state.new_spell_ready:
+#    st.session_state.awakening_message = f"『{st.session_state.activated_spell}』 勇者は　うまれた！"
+#    st.session_state.show_awakening_message = True
+#    st.session_state.new_spell_ready = False
+#    st.session_state.mode = "ready"
+#    st.rerun()
 
 
 
@@ -387,6 +390,7 @@ if st.session_state.mode == "returning":
                 custom_message("その　じゅもんは　まちがっております", color="red")
 
     if st.session_state.spell_checked and not st.session_state.spell_valid:
+        st.markdown("<br>", unsafe_allow_html=True)  # ← ここでスペース追加
         if st.button("このじゅもんで新しい冒険を始める"):
             # Supabaseに追加
             def add_spell_to_status(new_spell):
@@ -399,7 +403,7 @@ if st.session_state.mode == "returning":
             st.session_state.mode = "ready"
             st.session_state.activated_spell = st.session_state.spell_last_input
             st.session_state.user_data = {"level": 1, "exp": 0}
-            st.session_state.awakening_message = f"『{st.session_state.activated_spell}』勇者は　めをさました！"
+            st.session_state.awakening_message = f"『{st.session_state.activated_spell}』勇者は　うまれた！"
             st.session_state.show_awakening_message = True
             st.rerun()
 
@@ -412,8 +416,10 @@ if st.session_state.mode is None:
         if spell in spell_db:
             st.session_state.activated_spell = spell
             st.session_state.user_data = spell_db[spell]
-            custom_message("『{spell}』勇者は　めをさました！", color="green")
-            
+            st.session_state.awakening_message = f"『{spell}』勇者は　めをさました！"
+            st.session_state.show_awakening_message = True
+            st.session_state.mode = "ready"
+            st.rerun()
         else:
             st.session_state.activated_spell = None
             st.session_state.user_data = None
@@ -460,7 +466,7 @@ if st.session_state.mode == "ready" and st.session_state.activated_spell:
     if st.session_state.show_awakening_message:
         custom_message(st.session_state.awakening_message, color="green")
         st.session_state.show_awakening_message = False
-        st.stop()
+#        st.stop()
 
     show_hero_status(st.session_state.activated_spell)  # 勇者ステータス
 
